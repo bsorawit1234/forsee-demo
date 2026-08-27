@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 
 type JobStatus = 'กำลังเก็บ' | 'กำลังเดินทาง' | 'รอเริ่มงาน' | 'เสร็จสิ้น';
+type ViewMode = 'owner' | 'customer';
 
 type Job = {
   id: string;
@@ -84,7 +85,21 @@ const statusTone: Record<JobStatus, string> = {
   'เสร็จสิ้น': 'status-blue',
 };
 
+const thaiMonths = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
+const allTimeSlots = ['09:00 — 11:30', '13:00 — 15:30', '15:30 — 18:00'];
+
+type CalendarAvailability = 'open' | 'limited' | 'closed';
+
+function getCalendarAvailability(year: number, month: number, day: number): { state: CalendarAvailability; slots: string[] } {
+  const weekday = new Date(year, month, day).getDay();
+  if (weekday === 0 || weekday === 6) return { state: 'closed', slots: [] };
+  if (month === 7 && [5, 12, 18, 27].includes(day)) return { state: 'limited', slots: ['13:00 — 15:30'] };
+  if (month === 7 && [8, 16, 23].includes(day)) return { state: 'closed', slots: [] };
+  return { state: 'open', slots: allTimeSlots };
+}
+
 export default function Home() {
+  const [viewMode, setViewMode] = useState<ViewMode>('owner');
   const [activeNav, setActiveNav] = useState('ภาพรวม');
   const [activeFilter, setActiveFilter] = useState('ทั้งหมด');
   const [showBooking, setShowBooking] = useState(false);
@@ -99,6 +114,10 @@ export default function Home() {
     setToast(message);
     window.setTimeout(() => setToast(''), 3200);
   };
+
+  if (viewMode === 'customer') {
+    return <CustomerScreen onSwitchToOwner={() => setViewMode('owner')} notify={notify} />;
+  }
 
   return (
     <main className="app-shell">
@@ -158,6 +177,7 @@ export default function Home() {
           <div className="breadcrumb"><span>ศูนย์ปฏิบัติการ</span><b>/</b><strong>{activeNav}</strong></div>
           <div className="topbar-actions">
             <div className="system-live"><span className="live-dot" />ระบบทำงานปกติ</div>
+            <RoleSwitcher viewMode={viewMode} onChange={setViewMode} />
             <button className="icon-button" aria-label="ค้นหา" onClick={() => notify('ค้นหาการจอง, ลูกค้า หรือรถได้จากเมนูนี้')}><span>⌕</span></button>
             <button className="icon-button notification" aria-label="การแจ้งเตือน" onClick={() => notify('คุณมีการแจ้งเตือนใหม่ 3 รายการ')}><span>♢</span><i /></button>
           </div>
@@ -236,6 +256,90 @@ export default function Home() {
       {toast && <div className="toast" role="status"><span className="toast-check">✓</span>{toast}</div>}
     </main>
   );
+}
+
+function RoleSwitcher({ viewMode, onChange }: { viewMode: ViewMode; onChange: (value: ViewMode) => void }) {
+  return <label className="role-switcher"><span>โหมดสาธิต</span><select value={viewMode} onChange={(event) => onChange(event.target.value as ViewMode)} aria-label="เลือกมุมมองผู้ใช้งาน"><option value="owner">เจ้าของกิจการ</option><option value="customer">ลูกค้าองค์กร</option></select></label>;
+}
+
+function CustomerScreen({ onSwitchToOwner, notify }: { onSwitchToOwner: () => void; notify: (message: string) => void }) {
+  const [selectedService, setSelectedService] = useState('ดูดบ่อดักไขมัน');
+  const [calendarMonth, setCalendarMonth] = useState(7);
+  const [selectedDate, setSelectedDate] = useState('2025-08-25');
+  const [selectedSlot, setSelectedSlot] = useState('09:00 — 11:30');
+  const [location, setLocation] = useState('โรงงาน ไทยรุ่ง — บางปะกง, ฉะเชิงเทรา');
+  const [submitted, setSubmitted] = useState(false);
+  const services = [
+    { name: 'ดูดบ่อดักไขมัน', description: 'รถดูดสูญญากาศ', icon: '≋', tone: 'teal' },
+    { name: 'ขนส่งกากอุตสาหกรรม', description: 'รถขนกากมาตรฐาน', icon: '▱', tone: 'amber' },
+    { name: 'ล้างบ่อบำบัดน้ำเสีย', description: 'รถดูดตะกอน', icon: '✧', tone: 'violet' },
+  ];
+  const year = 2025;
+  const selectedMonth = Number(selectedDate.slice(5, 7)) - 1;
+  const selectedDay = Number(selectedDate.slice(8, 10));
+  const selectedAvailability = getCalendarAvailability(year, selectedMonth, selectedDay);
+  const timeSlots = selectedAvailability.slots;
+
+  const chooseDate = (day: number) => {
+    const dateKey = `${year}-${String(calendarMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const availability = getCalendarAvailability(year, calendarMonth, day);
+    if (availability.state === 'closed') return;
+    setSelectedDate(dateKey);
+    setSelectedSlot(availability.slots[0]);
+  };
+
+  const changeMonth = (offset: number) => {
+    setCalendarMonth((current) => (current + offset + 12) % 12);
+  };
+
+  const submitBooking = () => {
+    setSubmitted(true);
+    notify('ส่งคำขอจองเรียบร้อยแล้ว ทีมงานจะยืนยันภายใน 15 นาที');
+  };
+
+  return <main className="app-shell customer-shell">
+    <aside className="sidebar customer-sidebar">
+      <div className="brand"><div className="brand-mark">F</div><div><div className="brand-name">FORESEE</div><div className="brand-sub">CORPORATION</div></div></div>
+      <div className="workspace-switcher"><div className="workspace-icon customer-workspace">TR</div><div className="workspace-copy"><span>ไทยรุ่งอุตสาหกรรม</span><small>พอร์ทัลลูกค้า</small></div><span className="chevron">⌄</span></div>
+      <p className="nav-label">เมนูลูกค้า</p>
+      <nav className="nav-list" aria-label="เมนูลูกค้า">
+        <button className="nav-item active"><span className="nav-icon">＋</span><span>จองรถบริการ</span></button>
+        <button className="nav-item" onClick={() => notify('รายการจองของฉันจะเชื่อมต่อกับข้อมูลจริงในเวอร์ชันถัดไป')}><span className="nav-icon">▣</span><span>รายการจองของฉัน</span><span className="nav-count">3</span></button>
+        <button className="nav-item" onClick={() => notify('ข้อมูลบริษัทพร้อมแก้ไขในเวอร์ชันถัดไป')}><span className="nav-icon">◎</span><span>ข้อมูลบริษัท</span></button>
+      </nav>
+      <p className="nav-label nav-label-spaced">ช่วยเหลือ</p>
+      <nav className="nav-list"><button className="nav-item" onClick={() => notify('ทีมซัพพอร์ตจะติดต่อกลับในไม่ช้า')}><span className="nav-icon">?</span><span>ติดต่อ Foresee</span></button></nav>
+      <div className="sidebar-bottom"><div className="support-card"><div className="support-orb">✦</div><div><strong>ต้องการความช่วยเหลือ?</strong><span>ทีมซัพพอร์ตพร้อมดูแลคุณ</span></div><button aria-label="เปิดความช่วยเหลือ" onClick={() => notify('ทีมซัพพอร์ตจะติดต่อกลับในไม่ช้า')}>↗</button></div><div className="profile-row"><div className="avatar avatar-gold">ทร</div><div className="profile-copy"><strong>ธนกร รุ่งเรือง</strong><span>ผู้ประสานงาน</span></div><button className="more-button" aria-label="เมนูผู้ใช้งาน">•••</button></div></div>
+    </aside>
+    <section className="main-content">
+      <header className="topbar"><div className="mobile-brand"><div className="brand-mark">F</div><span>FORESEE</span></div><div className="breadcrumb"><span>พอร์ทัลลูกค้า</span><b>/</b><strong>จองรถบริการ</strong></div><div className="topbar-actions"><div className="customer-help">ต้องการความช่วยเหลือ? <button onClick={() => notify('ทีมซัพพอร์ตจะติดต่อกลับในไม่ช้า')}>ติดต่อเรา</button></div><RoleSwitcher viewMode="customer" onChange={(value) => value === 'owner' && onSwitchToOwner()} /><button className="icon-button" aria-label="การแจ้งเตือน" onClick={() => notify('คุณมีการแจ้งเตือนใหม่ 1 รายการ')}><span>♢</span><i /></button></div></header>
+      <div className="content-wrap customer-content">
+        <div className="customer-heading"><div><p className="eyebrow">พอร์ทัลลูกค้า <span className="heading-dot" /> ไทยรุ่งอุตสาหกรรม</p><h1>จองรถบริการของคุณ</h1><p className="heading-copy">เลือกบริการ วันเวลา และสถานที่ที่ต้องการให้ทีม Foresee เข้าดูแล</p></div><div className="customer-trust"><span>✓ ยืนยันคิวภายใน 15 นาที</span><span>◉ ทีมงานดูแลตลอดวัน</span></div></div>
+        <div className="customer-booking-layout">
+          <section className="panel customer-flow-card">
+            <div className="flow-head"><div><span className="modal-eyebrow">เริ่มต้นการจอง</span><h2>บอกเราได้เลยว่าต้องการอะไร</h2></div><span className="flow-required">ทุกช่องที่มี <b>*</b> จำเป็น</span></div>
+            <div className="booking-steps"><div className="booking-step active"><span>01</span><div><b>เลือกบริการ</b><small>ประเภทงานและรถ</small></div></div><div className="step-line" /><div className="booking-step"><span>02</span><div><b>เลือกวันเวลา</b><small>คิวที่สะดวก</small></div></div><div className="step-line" /><div className="booking-step"><span>03</span><div><b>ยืนยันรายละเอียด</b><small>สถานที่เข้าบริการ</small></div></div></div>
+            <div className="flow-section"><div className="flow-section-title"><div><h3>1. เลือกประเภทบริการ</h3><p>เลือกบริการที่ตรงกับงานของคุณ</p></div><span className="required-mark">*</span></div><div className="service-choice-grid">{services.map((service) => <button key={service.name} className={`service-choice ${selectedService === service.name ? 'selected' : ''}`} onClick={() => setSelectedService(service.name)}><span className={`service-choice-icon ${service.tone}`}>{service.icon}</span><span><b>{service.name}</b><small>{service.description}</small></span><i>{selectedService === service.name ? '✓' : ''}</i></button>)}</div></div>
+            <div className="flow-section date-section"><div className="flow-section-title"><div><h3>2. เลือกวันและเวลาที่สะดวก</h3><p>แสดงเฉพาะช่วงเวลาที่เปิดรับบริการ</p></div><span className="required-mark">*</span></div><BookingCalendar year={year} month={calendarMonth} selectedDate={selectedDate} onChooseDate={chooseDate} onPreviousMonth={() => changeMonth(-1)} onNextMonth={() => changeMonth(1)} onToday={() => { setCalendarMonth(7); setSelectedDate('2025-08-25'); setSelectedSlot('09:00 — 11:30'); }} /><div className="slot-picker"><span>ช่วงเวลาที่เปิดรับในวันที่ {selectedDay} {thaiMonths[selectedMonth]}</span><div>{timeSlots.map((slot) => <button key={slot} className={selectedSlot === slot ? 'selected' : ''} onClick={() => setSelectedSlot(slot)}><span className="slot-dot" />{slot}</button>)}</div></div></div>
+            <div className="flow-section location-section"><div className="flow-section-title"><div><h3>3. ยืนยันสถานที่เข้าบริการ</h3><p>ทีมงานจะใช้ข้อมูลนี้สำหรับเตรียมเส้นทาง</p></div><span className="required-mark">*</span></div><label className="customer-field"><span>สถานที่ / ชื่อโรงงาน</span><div className="field-with-icon"><span>⌖</span><input value={location} onChange={(event) => setLocation(event.target.value)} placeholder="กรอกชื่อสถานที่หรือที่อยู่" /></div></label><label className="customer-field"><span>หมายเหตุเพิ่มเติม <em>(ถ้ามี)</em></span><textarea placeholder="เช่น ต้องเข้าทางประตู 2, ติดต่อคุณ..." rows={3} /></label></div>
+          </section>
+          <aside className="customer-summary-column"><section className="panel booking-summary-card"><div className="summary-label">สรุปการจอง</div><h3>{submitted ? 'คำขอจองของคุณถูกส่งแล้ว' : 'พร้อมให้เราเข้าดูแล'}</h3>{submitted ? <div className="submitted-state"><span>✓</span><p>ทีม Foresee กำลังตรวจสอบคิวรถและจะติดต่อกลับเพื่อยืนยันรายละเอียด</p></div> : <><div className="summary-service"><span className="summary-service-icon teal">≋</span><div><small>บริการที่เลือก</small><b>{selectedService}</b></div></div><div className="summary-details"><div><span>วันที่เข้าบริการ</span><b>{selectedDate} สิงหาคม 2568</b></div><div><span>ช่วงเวลา</span><b>{selectedSlot}</b></div><div><span>สถานที่</span><b>{location || 'ยังไม่ได้ระบุสถานที่'}</b></div></div><div className="summary-note"><span>✦</span><p>เราจะยืนยันรถและเวลาที่เหมาะสมให้คุณภายใน 15 นาที หลังส่งคำขอ</p></div><button className="primary-button summary-submit" onClick={submitBooking}>ส่งคำขอจอง <span>→</span></button></>}</section><section className="panel upcoming-card"><div className="panel-title-row"><div><h3>การจองล่าสุด</h3><p>รายการที่กำลังดำเนินการ</p></div><span className="status-pill status-amber"><i />รอยืนยัน</span></div><div className="upcoming-service"><div className="upcoming-date"><b>27</b><span>ส.ค.</span></div><div><strong>ขนส่งกากอุตสาหกรรม</strong><span>13:00 — 15:30 <i /> BK-240825-016</span></div></div><button className="text-button" onClick={() => notify('เปิดรายละเอียดรายการจองล่าสุด')}>ดูรายละเอียด <span>→</span></button></section></aside>
+        </div>
+      </div>
+    </section>
+    {submitted && <div className="toast" role="status"><span className="toast-check">✓</span>ส่งคำขอจองเรียบร้อยแล้ว</div>}
+  </main>;
+}
+
+function BookingCalendar({ year, month, selectedDate, onChooseDate, onPreviousMonth, onNextMonth, onToday }: { year: number; month: number; selectedDate: string; onChooseDate: (day: number) => void; onPreviousMonth: () => void; onNextMonth: () => void; onToday: () => void }) {
+  const firstWeekday = (new Date(year, month, 1).getDay() + 6) % 7;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const calendarDays = Array.from({ length: 42 }, (_, index) => {
+    const day = index - firstWeekday + 1;
+    return day > 0 && day <= daysInMonth ? day : null;
+  });
+
+  return <div className="calendar-booking"><div className="calendar-booking-head"><button className="month-arrow" onClick={onPreviousMonth} aria-label="เดือนก่อนหน้า">←</button><div><b>{thaiMonths[month]} 2568</b><small>เลือกวันเข้าบริการ</small></div><div className="calendar-head-actions"><button className="today-button" onClick={onToday}>วันนี้</button><button className="month-arrow" onClick={onNextMonth} aria-label="เดือนถัดไป">→</button></div></div><div className="calendar-booking-week">{['จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส', 'อา'].map((day) => <span key={day}>{day}</span>)}</div><div className="calendar-booking-grid">{calendarDays.map((day, index) => { if (!day) return <span className="calendar-empty" key={`empty-${index}`} />; const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`; const availability = getCalendarAvailability(year, month, day); const isSelected = selectedDate === dateKey; const isToday = month === 7 && day === 25; return <button key={dateKey} disabled={availability.state === 'closed'} className={`${isSelected ? 'selected-date' : ''} ${isToday ? 'current-date' : ''} ${availability.state}-date`} onClick={() => onChooseDate(day)} aria-label={`${day} ${thaiMonths[month]} 2568 ${availability.state === 'closed' ? 'ปิดรับบริการ' : availability.state === 'limited' ? 'มีคิวบางช่วง' : 'คิวว่าง'}`}><span>{day}</span><i /></button>; })}</div><div className="calendar-booking-legend"><span><i className="selected-legend" />วันที่เลือก</span><span><i className="busy-legend" />มีคิวบางช่วง</span><span><i className="open-legend" />คิวว่าง</span><span><i className="closed-legend" />ปิดรับ</span></div></div>;
 }
 
 function MetricCard({ label, value, suffix, note, noteTone, icon, iconTone, spark }: { label: string; value: string; suffix?: string; note: string; noteTone: string; icon: string; iconTone: string; spark: number[] }) {
