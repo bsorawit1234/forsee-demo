@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service.js';
+import { AuditService } from '../../common/audit.service.js';
 import { EventBus } from '../events/event-bus.js';
 import type { SessionUser } from '../../common/request-user.js';
 import type { AssignBookingDto, BookingListQueryDto, CreateBookingDto } from './booking.dto.js';
@@ -32,7 +33,7 @@ function publicBooking(item: any) {
 
 @Injectable()
 export class BookingService {
-  constructor(private readonly prisma: PrismaService, private readonly events: EventBus) {}
+  constructor(private readonly prisma: PrismaService, private readonly events: EventBus, private readonly audit: AuditService) {}
 
   private readonly include = { customerOrganization: true, customerSite: true, serviceType: true, assignments: { where: { isCurrent: true }, include: { vehicle: true } } } as const;
 
@@ -98,6 +99,7 @@ export class BookingService {
       return booking;
     });
     this.events.publish({ type: 'booking.confirmed', bookingId: id });
+    this.audit.record({ actorUserId: user.id, organizationId: user.organizationId, action: 'booking.confirmed', entityType: 'booking', entityId: id, beforeJson: { bookingStatus: current.bookingStatus }, afterJson: { bookingStatus: updated.bookingStatus } });
     return publicBooking(updated);
   }
 
@@ -115,6 +117,7 @@ export class BookingService {
       return tx.booking.findUniqueOrThrow({ where: { id }, include: this.include });
     });
     this.events.publish({ type: 'booking.assignment.changed', bookingId: id, payload: { vehicleId: vehicle.id } });
+    this.audit.record({ actorUserId: user.id, organizationId: user.organizationId, action: 'booking.assigned', entityType: 'booking', entityId: id, afterJson: { vehicleId: vehicle.id } });
     return publicBooking(updated);
   }
 
@@ -130,6 +133,7 @@ export class BookingService {
       return item;
     });
     this.events.publish({ type: 'job.stage.changed', bookingId: id, payload: { jobStage } });
+    this.audit.record({ actorUserId: user.id, organizationId: user.organizationId, action: 'booking.stage.changed', entityType: 'booking', entityId: id, beforeJson: { jobStage: current.jobStage }, afterJson: { jobStage } });
     return publicBooking(updated);
   }
 }

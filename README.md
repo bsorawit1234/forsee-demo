@@ -68,7 +68,7 @@ Seed `900_demo_data` สร้างบัญชีตัวอย่าง ร�
 | กลุ่ม | Endpoint |
 | --- | --- |
 | Auth | `POST /api/v1/auth/login`, `GET /api/v1/auth/me`, `POST /api/v1/auth/logout` |
-| Customer | `GET /api/v1/catalog/services`, `GET /api/v1/catalog/customer/sites`, `GET /api/v1/catalog/customer/availability`, `GET/POST /api/v1/customer/bookings` |
+| Customer | `GET /api/v1/catalog/services`, `GET /api/v1/catalog/customer/sites`, `GET/POST /api/v1/catalog/customer/availability`, `GET/POST /api/v1/customer/bookings` |
 | Operations | `GET /api/v1/ops/dashboard`, `GET /api/v1/ops/bookings`, `GET /api/v1/ops/calendar/week`, `GET /api/v1/ops/calendar/day` |
 | Fleet / customers | `GET /api/v1/ops/vehicles`, `GET /api/v1/ops/customers` |
 | Realtime | `GET /api/v1/events` (SSE) |
