@@ -36,7 +36,7 @@ pnpm dev
 
 ```bash
 docker compose -f infra/compose.yaml up --build
-docker compose -f infra/compose.yaml --profile seed run --rm seed
+docker compose -f infra/compose.yaml --profile seed run --build --rm seed
 ```
 
 Compose แยก `migrate` เป็น one-off job และให้ `api` เริ่มหลัง migration สำเร็จ ไม่ให้ replica แต่ละตัวแข่งกัน migrate เอง

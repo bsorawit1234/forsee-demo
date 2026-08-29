@@ -28,5 +28,6 @@ COPY --from=runtime-deps /prod/api/package.json ./package.json
 COPY --from=runtime-deps /prod/api/node_modules ./node_modules
 COPY --from=build /workspace/packages/database/prisma ./prisma
 COPY --from=build /workspace/packages/database/seeds ./seeds
+RUN ./node_modules/.bin/prisma generate --schema=./prisma/schema.prisma
 EXPOSE 3000
 CMD ["node", "dist/main.js"]
