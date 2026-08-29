@@ -42,6 +42,6 @@ async function bootstrap() {
   await app.listen(Number(process.env.API_PORT ?? 3000), '0.0.0.0');
 }
 
-if (process.env.NODE_ENV !== 'test') {
+if (process.env.NODE_ENV !== 'test' || process.env.START_SERVER === 'true') {
   void bootstrap();
 }
