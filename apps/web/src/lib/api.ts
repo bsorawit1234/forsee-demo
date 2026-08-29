@@ -13,9 +13,23 @@ export type ApiBooking = {
   jobStage: string;
   slaHealth: string;
   vehicle?: string | null;
+  vehicleId?: string | null;
+  vehicleRegistrationNumber?: string | null;
+  vehicleType?: string | null;
 };
 
 export type ApiBookingsResponse = { items: ApiBooking[]; total: number };
+
+export type ApiVehicle = {
+  id: string;
+  registrationNumber: string;
+  displayName: string;
+  type: string;
+  status: string;
+  bookingId?: string | null;
+};
+
+export type ApiVehiclesResponse = { items: ApiVehicle[] };
 
 const enabled = import.meta.env.VITE_API_ENABLED === 'true';
 
@@ -32,6 +46,11 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
 export function fetchOperationsBookings() {
   if (!enabled) return Promise.reject(new Error('API disabled for demo mode'));
   return request<ApiBookingsResponse>(getBookingControllerOpsListUrl());
+}
+
+export function fetchOperationsVehicles() {
+  if (!enabled) return Promise.reject(new Error('API disabled for demo mode'));
+  return request<ApiVehiclesResponse>('/api/v1/ops/vehicles');
 }
 
 export function submitCustomerBooking(payload: { serviceCode: string; customerSiteId: string; requestedDate: string; requestedStart: string; requestedEnd: string; estimatedVolume?: number; customerNote?: string }) {

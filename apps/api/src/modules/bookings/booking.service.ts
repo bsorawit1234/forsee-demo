@@ -26,6 +26,9 @@ function publicBooking(item: any) {
     jobStage: item.jobStage,
     slaHealth: item.slaHealth,
     vehicle: assignment?.vehicle?.displayName ?? null,
+    vehicleId: assignment?.vehicle?.id ?? null,
+    vehicleRegistrationNumber: assignment?.vehicle?.registrationNumber ?? null,
+    vehicleType: assignment?.vehicle?.vehicleType?.nameTh ?? null,
     driverUserId: assignment?.driverUserId ?? null,
     updatedAt: item.updatedAt,
   };
@@ -35,7 +38,7 @@ function publicBooking(item: any) {
 export class BookingService {
   constructor(private readonly prisma: PrismaService, private readonly events: EventBus, private readonly audit: AuditService) {}
 
-  private readonly include = { customerOrganization: true, customerSite: true, serviceType: true, assignments: { where: { isCurrent: true }, include: { vehicle: true } } } as const;
+  private readonly include = { customerOrganization: true, customerSite: true, serviceType: true, assignments: { where: { isCurrent: true }, include: { vehicle: { include: { vehicleType: true } } } } } as const;
 
   async customerList(user: SessionUser, query: BookingListQueryDto) {
     const where: any = { customerOrganizationId: user.organizationId };

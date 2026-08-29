@@ -107,6 +107,208 @@ button { cursor: pointer; }
 .toast { position: fixed; z-index: 30; right: 23px; bottom: 23px; display: flex; align-items: center; gap: 8px; max-width: min(380px, calc(100vw - 46px)); padding: 12px 15px; border: 1px solid #b9e3d5; border-radius: 7px; color: #2e7061; background: #effbf6; box-shadow: 0 10px 30px #173c3724; font-size: 10px; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
 
+/* Operations mode: larger touch targets and readable type for daily dispatch work. */
+@media (min-width: 761px) {
+  .sidebar { width: 280px; flex-basis: 280px; padding: 30px 18px 20px; }
+  .brand-lockup { gap: 12px; padding: 0 12px 28px; }
+  .brand-mark { width: 38px; height: 38px; font-size: 23px; }
+  .brand-lockup strong { font-size: 18px; }
+  .brand-lockup span { font-size: 9px; }
+  .workspace { min-height: 70px; padding: 13px; border-radius: 10px; }
+  .workspace-avatar { width: 40px; height: 40px; font-size: 12px; }
+  .workspace b { font-size: 13px; }
+  .workspace span { font-size: 11px; }
+  .nav-caption { margin: 32px 12px 11px; font-size: 11px; }
+  .nav-link { min-height: 48px; gap: 13px; padding: 0 13px; border-radius: 9px; font-size: 14px; }
+  .nav-link em { min-width: 28px; padding: 4px 7px; font-size: 11px; }
+  .support-box { gap: 10px; padding: 13px; }
+  .support-box > span { width: 32px; height: 32px; }
+  .support-box b { font-size: 11px; }
+  .support-box small { font-size: 10px; }
+  .account { gap: 11px; padding: 15px 11px 0; }
+  .account b { font-size: 12px; }
+  .account small { font-size: 10px; }
+  .avatar { width: 36px; height: 36px; font-size: 11px; }
+  .topbar { height: 78px; padding: 0 44px; }
+  .breadcrumbs { gap: 12px; font-size: 13px; }
+  .topbar-actions { gap: 13px; }
+  .live-indicator { font-size: 12px; }
+  .portal-switcher { height: 42px; padding: 0 12px; border-radius: 9px; }
+  .portal-switcher span, .portal-switcher select { font-size: 12px; }
+  .portal-switcher select { max-width: 125px; }
+  .icon-button { width: 42px; height: 42px; border-radius: 9px; }
+  .icon-button.small { width: 36px; height: 36px; }
+  .content-area { max-width: 1600px; padding: 38px 44px 60px; }
+  .page-header { margin-bottom: 30px; }
+  .eyebrow { font-size: 11px; }
+  .page-header h1 { margin-top: 10px; font-size: clamp(32px, 3vw, 42px); }
+  .page-header p { font-size: 15px; }
+  .primary-button, .secondary-button { min-height: 46px; padding: 0 18px; border-radius: 9px; font-size: 13px; }
+  .quiet-button { min-height: 36px; font-size: 13px; }
+  .toolbar, .monitor-toolbar, .calendar-toolbar { gap: 12px; margin-bottom: 20px; }
+  .toolbar-search { height: 46px; min-width: 340px; padding: 0 14px; border-radius: 9px; }
+  .toolbar-search input { font-size: 13px; }
+  .filter-button, .date-button, .today-button, .select-control { min-height: 46px; height: 46px; padding: 0 15px; border-radius: 9px; font-size: 13px; }
+  .metric-strip, .fleet-summary { gap: 16px; margin-bottom: 34px; }
+  .metric { min-height: 132px; gap: 15px; padding: 21px; border-radius: 12px; }
+  .metric-icon { width: 42px; height: 42px; border-radius: 9px; }
+  .metric span { font-size: 13px; }
+  .metric strong { margin-top: 5px; font-size: 36px; }
+  .metric small { font-size: 11px; }
+  .section-heading { margin-bottom: 16px; }
+  .section-heading h2 { font-size: 21px; }
+  .section-heading p { font-size: 13px; }
+  .split-layout { grid-template-columns: minmax(0, 1fr) 350px; gap: 18px; }
+  .side-stack { gap: 18px; }
+  .panel { border-radius: 12px; }
+  .panel-head { gap: 16px; padding: 21px 24px 17px; }
+  .panel-head h3 { font-size: 17px; }
+  .panel-head p { margin-top: 5px; font-size: 12px; }
+  .head-title { gap: 9px; font-size: 13px; }
+  .table-row { grid-template-columns: 1.15fr 1.3fr .95fr 1.05fr .62fr 28px; gap: 16px; min-width: 940px; padding: 0 24px; }
+  .table-header { min-height: 42px; font-size: 12px; }
+  .table-data { min-height: 88px; font-size: 13px; }
+  .table-data b { font-size: 13px; }
+  .table-data small { margin-top: 5px; font-size: 11px; }
+  .status-chip, .fleet-status { min-height: 28px; padding: 0 10px; border-radius: 7px; font-size: 11px; }
+  .stage-label, .sla-ok, .sla-alert { font-size: 11px; }
+  .empty-table { padding: 44px; font-size: 13px; }
+  .attention-panel, .capacity-panel { padding-bottom: 15px; }
+  .attention-list { gap: 3px; padding: 0 12px; }
+  .attention-list button { gap: 11px; padding: 12px; }
+  .attention-icon { width: 32px; height: 32px; }
+  .attention-list b { font-size: 12px; }
+  .attention-list small, .empty-mini { font-size: 11px; }
+  .capacity-bars { gap: 12px; padding: 0 24px 16px; }
+  .capacity-bars > div { grid-template-columns: 28px 1fr 24px; gap: 10px; }
+  .capacity-bars span, .capacity-bars b { font-size: 12px; }
+  .bar-track { height: 9px; }
+  .capacity-note { gap: 8px; padding: 13px 24px 0; font-size: 11px; }
+  .activity-panel { margin-top: 18px; }
+  .activity-grid { gap: 24px; padding: 0 24px 22px; }
+  .activity-item { gap: 11px; padding-top: 17px; }
+  .activity-item p { font-size: 12px; }
+  .activity-item small { font-size: 10px; }
+  .monitor-panel { padding-bottom: 12px; }
+  .monitor-toolbar { padding: 20px 24px 0; }
+  .table-meta { padding: 4px 24px 16px; font-size: 11px; }
+  .date-navigation { gap: 9px; }
+  .date-navigation b { margin-left: 11px; font-size: 15px; }
+  .calendar-capacity-summary { display: flex; align-items: center; gap: 7px; margin-left: auto; color: #4e8577; font-size: 12px; font-weight: 600; }
+  .view-switch { padding: 4px; border-radius: 9px; }
+  .view-switch button { min-height: 38px; padding: 0 14px; border-radius: 7px; font-size: 12px; }
+  .week-grid { gap: 2px; padding: 2px; }
+  .week-day { min-height: 214px; padding: 22px 19px; }
+  .week-day span { font-size: 12px; }
+  .week-day b { margin-top: 5px; font-size: 31px; }
+  .week-day small { margin-top: 26px; font-size: 13px; }
+  .day-capacity { height: 10px; margin-top: 10px; }
+  .week-day em { margin-top: 17px; font-size: 11px; }
+  .calendar-hint { gap: 10px; margin-top: 14px; font-size: 13px; }
+  .today-button { min-height: 38px; height: 38px; font-size: 12px; }
+  .dispatch-panel { padding-bottom: 28px; }
+  .dispatch-summary { font-size: 12px; }
+  .unassigned-banner { gap: 13px; margin: 0 24px 18px; padding: 13px 15px; border-radius: 9px; font-size: 12px; }
+  .unassigned-banner button { min-height: 36px; padding: 0 13px; border-radius: 7px; font-size: 12px; }
+  .dispatch-grid { grid-template-columns: 260px repeat(3, minmax(220px, 1fr)); margin: 0 24px; }
+  .resource-head, .slot-head { min-height: 50px; padding: 0 14px; font-size: 12px; }
+  .resource-name { min-height: 98px; gap: 9px; padding: 12px; font-size: 12px; }
+  .resource-name > span { min-width: 0; flex: 1; }
+  .resource-name b, .resource-name small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .resource-name b { color: #54756b; font-size: 13px; }
+  .resource-name small { margin-top: 3px; color: #8ca19b; font-size: 11px; }
+  .resource-name .fleet-status { flex: 0 0 auto; }
+  .dispatch-cell { min-height: 98px; padding: 12px; }
+  .dispatch-cell b { font-size: 12px; }
+  .dispatch-cell small, .dispatch-cell em { font-size: 11px; }
+  .fleet-card { grid-template-columns: 52px minmax(0, 1fr) auto; gap: 15px; margin: 0 24px; padding: 19px 0; }
+  .fleet-symbol { width: 48px; height: 48px; border-radius: 10px; }
+  .fleet-card-main b { font-size: 14px; }
+  .fleet-card-main small { margin-top: 4px; font-size: 12px; }
+  .fleet-card-main span { margin-top: 8px; font-size: 11px; }
+  .fleet-note { gap: 11px; margin-top: 18px; padding: 16px 19px; font-size: 13px; }
+  .report-grid { gap: 18px; }
+  .report-panel { min-height: 280px; }
+  .report-panel .panel-head > span { font-size: 12px; }
+  .report-bars { gap: 20px; padding: 18px 24px 26px; }
+  .report-bar { grid-template-columns: 125px 1fr 28px; gap: 13px; }
+  .report-bar > span { font-size: 12px; }
+  .report-bar > b { font-size: 15px; }
+  .report-bar > div, .mini-progress { height: 10px; }
+  .sla-overview { gap: 9px; padding: 30px 24px 13px; }
+  .sla-overview strong { font-size: 48px; }
+  .sla-overview span { font-size: 12px; }
+  .mini-progress { margin: 5px 24px; }
+  .detail-drawer { width: min(100%, 520px); padding: 30px 32px; }
+  .drawer-header h2 { font-size: 27px; }
+  .drawer-header p { font-size: 11px; }
+  .drawer-status { gap: 10px; margin-top: 25px; padding-bottom: 21px; }
+  .drawer-section { padding: 22px 0; }
+  .drawer-section h3 { margin-bottom: 15px; font-size: 14px; }
+  .detail-line { grid-template-columns: 130px minmax(0, 1fr); gap: 11px; padding: 9px 0; }
+  .detail-line > span { gap: 8px; font-size: 12px; }
+  .detail-line b { font-size: 13px; }
+  .timeline-item { gap: 12px; min-height: 52px; }
+  .timeline-item > i { width: 20px; height: 20px; }
+  .timeline-item:not(:last-child)::before { top: 20px; left: 9px; height: 36px; }
+  .timeline-item > span b { font-size: 13px; }
+  .timeline-item > span small { font-size: 11px; }
+  .help-text, .help-text button, .trust-line { font-size: 12px; }
+  .customer-booking-layout { gap: 20px; }
+  .booking-form-panel { padding: 28px 30px; }
+  .stepper { margin-bottom: 32px; padding: 15px 17px; }
+  .step b { width: 32px; height: 32px; font-size: 11px; }
+  .step span { font-size: 11px; }
+  .form-section { padding: 27px 0 4px; }
+  .form-title h2 { font-size: 17px; }
+  .form-title p { font-size: 12px; }
+  .form-title > b { font-size: 11px; }
+  .service-cards { gap: 12px; margin-top: 18px; }
+  .service-card { min-height: 88px; gap: 11px; padding: 14px 13px; border-radius: 9px; }
+  .service-card b { font-size: 12px; }
+  .service-card small { font-size: 10px; }
+  .service-icon { width: 36px; height: 36px; font-size: 19px; }
+  .availability-days { gap: 9px; margin-top: 13px; }
+  .availability-day { gap: 5px; padding: 12px 8px; border-radius: 8px; }
+  .availability-day span { font-size: 12px; }
+  .availability-day b { font-size: 10px; }
+  .slot-area { margin-top: 20px; }
+  .slot-area > span { margin-bottom: 10px; font-size: 11px; }
+  .slot { min-height: 43px; padding: 0 11px; border-radius: 8px; font-size: 11px; }
+  .slot small { font-size: 9px; }
+  .field-label { gap: 8px; margin-top: 18px; font-size: 11px; }
+  .field-control input, .field-label input, .field-label textarea, .field-label select { border-radius: 8px; font-size: 13px; }
+  .field-control input, .field-label input, .field-label select { height: 46px; }
+  .field-control > svg { top: 14px; left: 12px; }
+  .field-label textarea { min-height: 90px; }
+  .summary-card { padding: 26px; }
+  .summary-kicker { font-size: 11px; }
+  .summary-card h2 { margin: 10px 0 23px; font-size: 21px; }
+  .summary-service { gap: 11px; padding: 14px; }
+  .summary-service small { font-size: 10px; }
+  .summary-service b { font-size: 12px; }
+  .summary-details { margin-top: 17px; }
+  .summary-details > div { padding: 14px 0; }
+  .summary-details span { font-size: 11px; }
+  .summary-details b { font-size: 11px; }
+  .summary-note { gap: 9px; margin-top: 16px; padding: 12px; }
+  .summary-note p { font-size: 10px; }
+  .recent-card { padding: 21px 23px; }
+  .recent-booking > b { font-size: 27px; }
+  .recent-booking strong { font-size: 11px; }
+  .recent-booking small { font-size: 10px; }
+  .customer-status-tabs button { padding-bottom: 14px; font-size: 12px; }
+  .customer-booking-card { padding: 22px 25px; }
+  .customer-booking-top > div > span { font-size: 10px; }
+  .customer-booking-top h2 { font-size: 17px; }
+  .customer-booking-top p, .customer-booking-meta { font-size: 11px; }
+  .progress-label { font-size: 11px; }
+  .profile-heading h2 { font-size: 18px; }
+  .profile-heading p, .profile-fields span { font-size: 11px; }
+  .profile-fields b { font-size: 13px; }
+  .toast { font-size: 12px; }
+}
+
 @media (max-width: 1120px) { .sidebar { width: 220px; flex-basis: 220px; }.topbar, .content-area { padding-right: 25px; padding-left: 25px; }.split-layout { grid-template-columns: 1fr; }.side-stack { grid-template-columns: repeat(2, 1fr); }.customer-booking-layout { grid-template-columns: 1fr; }.customer-summary { position: static; grid-template-columns: 1fr 1fr; }.report-grid { grid-template-columns: 1fr; } }
 @media (max-width: 760px) { .sidebar { display: none; }.topbar { height: 60px; padding: 0 17px; }.mobile-menu { display: inline-flex; }.breadcrumbs, .live-indicator, .help-text { display: none; }.content-area { padding: 24px 16px 40px; }.page-header { align-items: flex-start; flex-direction: column; gap: 16px; margin-bottom: 20px; }.page-header .primary-button, .page-header .secondary-button { width: 100%; }.metric-strip, .fleet-summary { grid-template-columns: repeat(2, 1fr); gap: 8px; }.metric { min-height: 102px; padding: 13px; }.metric strong { font-size: 24px; }.toolbar, .monitor-toolbar, .calendar-toolbar { flex-wrap: wrap; }.toolbar-search, .monitor-toolbar .toolbar-search { flex: 1 1 100%; min-width: 0; }.date-button { margin-left: 0; }.split-layout, .side-stack { grid-template-columns: 1fr; }.activity-grid { grid-template-columns: 1fr; gap: 0; }.activity-item { padding: 12px 0; }.calendar-toolbar { align-items: flex-start; }.view-switch { order: 3; width: 100%; margin-left: 0; }.view-switch button { flex: 1; }.week-grid { grid-template-columns: 1fr; }.week-day { min-height: 112px; }.week-day small { margin-top: 10px; }.week-day em { margin-top: 8px; }.dispatch-grid { margin-right: 12px; margin-left: 12px; }.service-cards { grid-template-columns: 1fr; }.availability-days { grid-template-columns: repeat(3, 1fr); }.slot-area > div { grid-template-columns: 1fr; }.customer-summary { grid-template-columns: 1fr; }.stepper { overflow: auto; }.step span { display: none; }.stepper > i { min-width: 18px; }.submitted-card { margin: 16px 0; padding: 32px 18px; }.submitted-card > div:last-child { flex-direction: column; }.customer-booking-top { display: block; }.customer-booking-top .status-chip { margin-top: 11px; }.profile-heading { align-items: flex-start; flex-wrap: wrap; }.profile-heading .secondary-button { width: 100%; }.profile-fields { grid-template-columns: 1fr; gap: 15px; }.detail-drawer { padding: 20px 18px; }.drawer-layer { justify-content: stretch; }.detail-drawer { width: 100%; } }
 @media (max-width: 430px) { .metric-strip, .fleet-summary { grid-template-columns: 1fr 1fr; }.metric { gap: 7px; padding: 11px; }.metric-icon { width: 27px; height: 27px; }.metric span { font-size: 9px; }.metric strong { font-size: 22px; }.topbar-actions { gap: 5px; }.portal-switcher span { display: none; }.portal-switcher select { max-width: 83px; }.form-title { display: block; }.form-title > b { display: block; margin-top: 7px; }.availability-days { grid-template-columns: repeat(2, 1fr); }.inline-fields { grid-template-columns: 1fr 90px; }.table-row { padding-right: 12px; padding-left: 12px; }.fleet-card { grid-template-columns: 34px minmax(0, 1fr); }.fleet-card > div:last-child { grid-column: 2; justify-content: space-between; }.fleet-symbol { width: 34px; height: 34px; } }

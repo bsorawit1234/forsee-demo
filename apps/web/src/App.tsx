@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { fetchOperationsBookings, isApiEnabled, submitCustomerBooking, watchOperationEvents, type ApiBooking } from './lib/api';
+import { fetchOperationsBookings, fetchOperationsVehicles, isApiEnabled, submitCustomerBooking, watchOperationEvents, type ApiBooking, type ApiVehicle } from './lib/api';
 import { formatThaiDate } from './lib/format';
 import {
   AlertTriangle,
@@ -43,14 +43,39 @@ type Booking = {
   start: string;
   end: string;
   vehicle: string;
+  vehicleId?: string;
+  vehicleRegistrationNumber?: string;
+  vehicleType?: string;
   driver: string;
   status: BookingStatus;
   stage: JobStage;
   sla: 'ปกติ' | 'ต้องติดตาม' | 'เกินกำหนด';
 };
 
+type VehicleResource = {
+  id: string;
+  registrationNumber: string;
+  name: string;
+  type: string;
+  status: 'ว่าง' | 'กำลังใช้งาน' | 'ซ่อมบำรุง' | 'ไม่พร้อมใช้งาน';
+  bookingId?: string | null;
+};
+
+const demoVehicles: VehicleResource[] = [
+  { id: 'demo-vacuum-1001', registrationNumber: 'ฟส-1001', name: 'รถดูดสูญญากาศ 10 ลบ.ม.', type: 'รถดูดสูญญากาศ 10 ลบ.ม.', status: 'กำลังใช้งาน', bookingId: 'BK-260829-018' },
+  { id: 'demo-vacuum-1002', registrationNumber: 'ฟส-1002', name: 'รถดูดสูญญากาศ 10 ลบ.ม. · คัน 2', type: 'รถดูดสูญญากาศ 10 ลบ.ม.', status: 'ว่าง' },
+  { id: 'demo-vacuum-1003', registrationNumber: 'ฟส-1003', name: 'รถดูดสูญญากาศ 10 ลบ.ม. · คัน 3', type: 'รถดูดสูญญากาศ 10 ลบ.ม.', status: 'ว่าง' },
+  { id: 'demo-waste-2001', registrationNumber: 'ฟส-2001', name: 'รถขนกากอุตสาหกรรม', type: 'รถขนกากอุตสาหกรรม', status: 'ว่าง' },
+  { id: 'demo-waste-2002', registrationNumber: 'ฟส-2002', name: 'รถขนกากอุตสาหกรรม · คัน 2', type: 'รถขนกากอุตสาหกรรม', status: 'ว่าง' },
+  { id: 'demo-sludge-3001', registrationNumber: 'ฟส-3001', name: 'รถดูดตะกอน 6 ลบ.ม.', type: 'รถดูดตะกอน 6 ลบ.ม.', status: 'กำลังใช้งาน', bookingId: 'BK-260829-020' },
+  { id: 'demo-sludge-3002', registrationNumber: 'ฟส-3002', name: 'รถดูดตะกอน 6 ลบ.ม. · คัน 2', type: 'รถดูดตะกอน 6 ลบ.ม.', status: 'ว่าง' },
+  { id: 'demo-water-4001', registrationNumber: 'ฟส-4001', name: 'รถบรรทุกน้ำ 12 ลบ.ม.', type: 'รถบรรทุกน้ำ 12 ลบ.ม.', status: 'ว่าง' },
+  { id: 'demo-water-4002', registrationNumber: 'ฟส-4002', name: 'รถบรรทุกน้ำ 12 ลบ.ม. · คัน 2', type: 'รถบรรทุกน้ำ 12 ลบ.ม.', status: 'ว่าง' },
+];
+
 const seedBookings: Booking[] = [
-  { id: 'BK-260829-018', customer: 'บริษัท ไทยรุ่งอุตสาหกรรม', service: 'ดูดบ่อดักไขมัน', site: 'บางปะกง, ฉะเชิงเทรา', date: '2026-08-29', start: '09:00', end: '11:30', vehicle: 'รถดูดสูญญากาศ 10 ลบ.ม.', driver: 'สมชาย ใจดี', status: 'กำลังดำเนินการ', stage: 'กำลังให้บริการ', sla: 'ปกติ' },
+  { id: 'BK-260829-018', customer: 'บริษัท ไทยรุ่งอุตสาหกรรม', service: 'ดูดบ่อดักไขมัน', site: 'บางปะกง, ฉะเชิงเทรา', date: '2026-08-29', start: '09:00', end: '11:30', vehicle: 'รถดูดสูญญากาศ 10 ลบ.ม.', vehicleId: 'demo-vacuum-1001', vehicleRegistrationNumber: 'ฟส-1001', vehicleType: 'รถดูดสูญญากาศ 10 ลบ.ม.', driver: 'สมชาย ใจดี', status: 'กำลังดำเนินการ', stage: 'กำลังให้บริการ', sla: 'ปกติ' },
+  { id: 'BK-260829-024', customer: 'บริษัท สยามฟู้ดส์ จำกัด', service: 'ดูดบ่อดักไขมัน', site: 'เทพารักษ์, สมุทรปราการ', date: '2026-08-29', start: '09:00', end: '11:30', vehicle: 'รถดูดสูญญากาศ 10 ลบ.ม.', vehicleId: 'demo-vacuum-1002', vehicleRegistrationNumber: 'ฟส-1002', vehicleType: 'รถดูดสูญญากาศ 10 ลบ.ม.', driver: 'ทีมภาคสนาม', status: 'ยืนยันแล้ว', stage: 'รอเริ่มงาน', sla: 'ปกติ' },
   { id: 'BK-260829-019', customer: 'โรงงาน เอส.พี.เคมีคอล', service: 'ขนส่งกากอุตสาหกรรม', site: 'มาบตาพุด, ระยอง', date: '2026-08-29', start: '10:30', end: '13:00', vehicle: 'รถขนกากอุตสาหกรรม', driver: 'วิชัย พรหมรักษา', status: 'ยืนยันแล้ว', stage: 'กำลังเดินทาง', sla: 'ต้องติดตาม' },
   { id: 'BK-260829-020', customer: 'บริษัท กรีนแพค จำกัด', service: 'ล้างบ่อบำบัดน้ำเสีย', site: 'ลาดกระบัง, กรุงเทพฯ', date: '2026-08-29', start: '13:00', end: '15:30', vehicle: 'รถดูดตะกอน 6 ลบ.ม.', driver: 'กิตติพงษ์ แสงทอง', status: 'ยืนยันแล้ว', stage: 'รอเริ่มงาน', sla: 'ปกติ' },
   { id: 'BK-260829-017', customer: 'โรงงาน อีโคเทค', service: 'ขนส่งน้ำเสีย', site: 'อมตะซิตี้, ชลบุรี', date: '2026-08-29', start: '08:00', end: '09:30', vehicle: 'รถบรรทุกน้ำ 12 ลบ.ม.', driver: 'ธนากร คำสุข', status: 'เสร็จสิ้น', stage: 'เสร็จสิ้น', sla: 'ปกติ' },
@@ -92,7 +117,12 @@ function toUiBooking(item: ApiBooking): Booking {
   const statuses: Record<string, BookingStatus> = { PENDING_CONFIRMATION: 'รอยืนยัน', CONFIRMED: 'ยืนยันแล้ว', REJECTED: 'รอยืนยัน', CANCELLED: 'เสร็จสิ้น' };
   const stages: Record<string, JobStage> = { SCHEDULED: 'รอเริ่มงาน', EN_ROUTE: 'กำลังเดินทาง', ARRIVED: 'ถึงหน้างาน', IN_SERVICE: 'กำลังให้บริการ', COMPLETED: 'เสร็จสิ้น' };
   const status = item.jobStage === 'IN_SERVICE' ? 'กำลังดำเนินการ' : item.jobStage === 'COMPLETED' ? 'เสร็จสิ้น' : statuses[item.bookingStatus] ?? 'ยืนยันแล้ว';
-  return { id: item.bookingNumber, customer: item.customer ?? 'ไม่ระบุลูกค้า', service: item.service ?? 'ไม่ระบุบริการ', site: item.site ?? 'ไม่ระบุสถานที่', date: thaiDate, start: clock(start), end: clock(end), vehicle: item.vehicle ?? 'ยังไม่จัดรถ', driver: item.vehicle ? 'ทีมภาคสนาม' : 'ยังไม่จัดทีม', status, stage: stages[item.jobStage] ?? 'รอเริ่มงาน', sla: item.slaHealth === 'OVERDUE' ? 'เกินกำหนด' : item.slaHealth === 'AT_RISK' ? 'ต้องติดตาม' : 'ปกติ' };
+  return { id: item.bookingNumber, customer: item.customer ?? 'ไม่ระบุลูกค้า', service: item.service ?? 'ไม่ระบุบริการ', site: item.site ?? 'ไม่ระบุสถานที่', date: thaiDate, start: clock(start), end: clock(end), vehicle: item.vehicle ?? 'ยังไม่จัดรถ', vehicleId: item.vehicleId ?? undefined, vehicleRegistrationNumber: item.vehicleRegistrationNumber ?? undefined, vehicleType: item.vehicleType ?? undefined, driver: item.vehicle ? 'ทีมภาคสนาม' : 'ยังไม่จัดทีม', status, stage: stages[item.jobStage] ?? 'รอเริ่มงาน', sla: item.slaHealth === 'OVERDUE' ? 'เกินกำหนด' : item.slaHealth === 'AT_RISK' ? 'ต้องติดตาม' : 'ปกติ' };
+}
+
+function toUiVehicle(item: ApiVehicle): VehicleResource {
+  const statuses: Record<string, VehicleResource['status']> = { AVAILABLE: 'ว่าง', IN_USE: 'กำลังใช้งาน', MAINTENANCE: 'ซ่อมบำรุง', INACTIVE: 'ไม่พร้อมใช้งาน' };
+  return { id: item.id, registrationNumber: item.registrationNumber, name: item.displayName, type: item.type, status: statuses[item.status] ?? 'ไม่พร้อมใช้งาน', bookingId: item.bookingId };
 }
 
 export default function App() {
@@ -100,6 +130,7 @@ export default function App() {
   const [companyView, setCompanyView] = useState<CompanyView>('overview');
   const [customerView, setCustomerView] = useState<CustomerView>('new-booking');
   const [bookings, setBookings] = useState(seedBookings);
+  const [vehicles, setVehicles] = useState(demoVehicles);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [toast, setToast] = useState('');
 
@@ -108,6 +139,7 @@ export default function App() {
     let mounted = true;
     const refresh = () => fetchOperationsBookings().then((result) => { if (mounted && result.items.length) setBookings(result.items.map(toUiBooking)); }).catch(() => undefined);
     refresh();
+    fetchOperationsVehicles().then((result) => { if (mounted && result.items.length) setVehicles(result.items.map(toUiVehicle)); }).catch(() => undefined);
     const stop = watchOperationEvents(refresh);
     return () => { mounted = false; stop(); };
   }, []);
@@ -136,6 +168,7 @@ export default function App() {
         <CompanyPortal
           view={companyView}
           bookings={bookings}
+          vehicles={vehicles}
           selectedBooking={selectedBooking}
           onNavigate={setCompanyView}
           onSelectBooking={setSelectedBooking}
@@ -160,6 +193,7 @@ export default function App() {
 function CompanyPortal({
   view,
   bookings,
+  vehicles,
   selectedBooking,
   onNavigate,
   onSelectBooking,
@@ -169,6 +203,7 @@ function CompanyPortal({
 }: {
   view: CompanyView;
   bookings: Booking[];
+  vehicles: VehicleResource[];
   selectedBooking: Booking | null;
   onNavigate: (view: CompanyView) => void;
   onSelectBooking: (booking: Booking | null) => void;
@@ -194,8 +229,8 @@ function CompanyPortal({
         <div className="content-area">
           {view === 'overview' && <CompanyOverview bookings={bookings} onSelectBooking={onSelectBooking} onNavigate={onNavigate} notify={notify} />}
           {view === 'bookings' && <BookingMonitor bookings={bookings} onSelectBooking={onSelectBooking} onNavigate={onNavigate} />}
-          {view === 'calendar' && <OperationsCalendar bookings={bookings} onSelectBooking={onSelectBooking} onUpdateBooking={onUpdateBooking} notify={notify} />}
-          {view === 'fleet' && <FleetView bookings={bookings} notify={notify} />}
+          {view === 'calendar' && <OperationsCalendar bookings={bookings} vehicles={vehicles} onSelectBooking={onSelectBooking} onUpdateBooking={onUpdateBooking} notify={notify} />}
+          {view === 'fleet' && <FleetView bookings={bookings} vehicles={vehicles} notify={notify} />}
           {view === 'customers' && <CustomersView bookings={bookings} onSelectBooking={onSelectBooking} />}
           {view === 'reports' && <ReportsView bookings={bookings} />}
         </div>
@@ -261,29 +296,47 @@ function Activity({ name, text, time, tone }: { name: string; text: string; time
   return <div className="activity-item"><div className={`avatar avatar-${tone}`}>{name.slice(0, 2)}</div><div><p><b>{name}</b> {text}</p><small>{time}</small></div></div>;
 }
 
-function OperationsCalendar({ bookings, onSelectBooking, onUpdateBooking, notify }: { bookings: Booking[]; onSelectBooking: (booking: Booking) => void; onUpdateBooking: (booking: Booking) => void; notify: (message: string) => void }) {
+function OperationsCalendar({ bookings, vehicles, onSelectBooking, onUpdateBooking, notify }: { bookings: Booking[]; vehicles: VehicleResource[]; onSelectBooking: (booking: Booking) => void; onUpdateBooking: (booking: Booking) => void; notify: (message: string) => void }) {
   const [selectedDate, setSelectedDate] = useState('2026-08-29');
   const [calendarMode, setCalendarMode] = useState<'week' | 'day'>('week');
   const week = ['2026-08-29', '2026-08-30', '2026-08-31', '2026-09-01', '2026-09-02'];
-  const resources = ['รถดูดสูญญากาศ 10 ลบ.ม.', 'รถขนกากอุตสาหกรรม', 'รถดูดตะกอน 6 ลบ.ม.', 'รถบรรทุกน้ำ 12 ลบ.ม.'];
   const selectedBookings = bookings.filter((booking) => booking.date === selectedDate);
-  const assignable = bookings.find((booking) => booking.vehicle === 'ยังไม่จัดรถ');
+  const assignable = selectedBookings.find((booking) => booking.vehicle === 'ยังไม่จัดรถ');
   return <>
-    <PageHeader eyebrow="Company Operations Center · Scheduling" title="ปฏิทินและจัดคิว" copy="ดู capacity ทั้งสัปดาห์ แล้วจัดรถจากมุมมองรายวัน" action={<button className="primary-button" onClick={() => notify('ช่องสร้าง Booking จะเปิดจาก Booking Monitor')}><Plus size={17} /> สร้างการจอง</button>} />
-    <div className="calendar-toolbar"><div className="date-navigation"><button className="icon-button small"><ArrowLeft size={16} /></button><button className="today-button" onClick={() => setSelectedDate('2026-08-29')}>วันนี้</button><button className="icon-button small"><ArrowRight size={16} /></button><b>29 ส.ค. – 2 ก.ย. 2569</b></div><div className="view-switch"><button className={calendarMode === 'week' ? 'selected' : ''} onClick={() => setCalendarMode('week')}>Week capacity</button><button className={calendarMode === 'day' ? 'selected' : ''} onClick={() => setCalendarMode('day')}>Day dispatch</button></div><button className="filter-button"><Filter size={15} /> กรอง</button></div>
-    {calendarMode === 'week' ? <section className="panel week-capacity"><div className="week-grid">{week.map((date) => { const dateBookings = bookings.filter((booking) => booking.date === date); const isSelected = selectedDate === date; return <button key={date} className={isSelected ? 'week-day selected' : 'week-day'} onClick={() => { setSelectedDate(date); setCalendarMode('day'); }}><span>{new Intl.DateTimeFormat('th-TH', { weekday: 'short' }).format(new Date(`${date}T00:00:00`))}</span><b>{new Intl.DateTimeFormat('th-TH', { day: 'numeric' }).format(new Date(`${date}T00:00:00`))}</b><small>{dateBookings.length} งาน</small><div className="day-capacity"><i style={{ width: `${Math.min(100, 18 + dateBookings.length * 23)}%` }} /></div><em>{dateBookings.filter((booking) => booking.vehicle === 'ยังไม่จัดรถ').length ? `${dateBookings.filter((booking) => booking.vehicle === 'ยังไม่จัดรถ').length} ยังไม่จัดรถ` : 'มีพื้นที่ว่าง'}</em></button>; })}</div></section> : <DayDispatch date={selectedDate} bookings={selectedBookings} resources={resources} unassigned={assignable} onSelectBooking={onSelectBooking} onUpdateBooking={onUpdateBooking} notify={notify} />}
+    <PageHeader eyebrow="Company Operations Center · Scheduling" title="ปฏิทินและจัดคิว" copy="รถแต่ละประเภทมีหลายคัน จึงรับงานช่วงเวลาเดียวกันได้ตามจำนวนรถที่ว่าง" action={<button className="primary-button" onClick={() => notify('ช่องสร้าง Booking จะเปิดจาก Booking Monitor')}><Plus size={17} /> สร้างการจอง</button>} />
+    <div className="calendar-toolbar"><div className="date-navigation"><button className="icon-button small"><ArrowLeft size={16} /></button><button className="today-button" onClick={() => setSelectedDate('2026-08-29')}>วันนี้</button><button className="icon-button small"><ArrowRight size={16} /></button><b>29 ส.ค. – 2 ก.ย. 2569</b></div><div className="calendar-capacity-summary"><Truck size={15} /> {vehicles.length} คันใน fleet · จองซ้อนเวลาได้ตามรถว่าง</div><div className="view-switch"><button className={calendarMode === 'week' ? 'selected' : ''} onClick={() => setCalendarMode('week')}>Week capacity</button><button className={calendarMode === 'day' ? 'selected' : ''} onClick={() => setCalendarMode('day')}>Day dispatch</button></div><button className="filter-button"><Filter size={15} /> กรอง</button></div>
+    {calendarMode === 'week' ? <section className="panel week-capacity"><div className="week-grid">{week.map((date) => { const dateBookings = bookings.filter((booking) => booking.date === date); const isSelected = selectedDate === date; const unassignedCount = dateBookings.filter((booking) => booking.vehicle === 'ยังไม่จัดรถ').length; return <button key={date} className={isSelected ? 'week-day selected' : 'week-day'} onClick={() => { setSelectedDate(date); setCalendarMode('day'); }}><span>{new Intl.DateTimeFormat('th-TH', { weekday: 'short' }).format(new Date(`${date}T00:00:00`))}</span><b>{new Intl.DateTimeFormat('th-TH', { day: 'numeric' }).format(new Date(`${date}T00:00:00`))}</b><small>{dateBookings.length} งาน · {vehicles.length} รถ</small><div className="day-capacity"><i style={{ width: `${Math.min(100, 18 + dateBookings.length * 23)}%` }} /></div><em>{unassignedCount ? `${unassignedCount} ยังไม่จัดรถ` : 'รถพร้อมรับงานซ้อน'}</em></button>; })}</div></section> : <DayDispatch date={selectedDate} bookings={selectedBookings} resources={vehicles} unassigned={assignable} onSelectBooking={onSelectBooking} onUpdateBooking={onUpdateBooking} notify={notify} />}
     {calendarMode === 'week' && <div className="calendar-hint"><CalendarDays size={16} /><span>เลือกวันที่เพื่อเปิด Day dispatch และจัดรถตามช่วงเวลา</span></div>}
   </>;
 }
 
-function DayDispatch({ date, bookings, resources, unassigned, onSelectBooking, onUpdateBooking, notify }: { date: string; bookings: Booking[]; resources: string[]; unassigned?: Booking; onSelectBooking: (booking: Booking) => void; onUpdateBooking: (booking: Booking) => void; notify: (message: string) => void }) {
+function DayDispatch({ date, bookings, resources, unassigned, onSelectBooking, onUpdateBooking, notify }: { date: string; bookings: Booking[]; resources: VehicleResource[]; unassigned?: Booking; onSelectBooking: (booking: Booking) => void; onUpdateBooking: (booking: Booking) => void; notify: (message: string) => void }) {
   const slots = ['09:00–11:30', '13:00–15:30', '15:30–18:00'];
-  return <section className="panel dispatch-panel"><div className="panel-head"><div><h3>จัดคิวรายวัน · {formatThaiDate(date)}</h3><p>เลือก Booking เพื่อดูรายละเอียด · ยังไม่ใช้ drag-and-drop เป็น action หลัก</p></div><span className="dispatch-summary">{bookings.length} งานในวันนี้</span></div>{unassigned && <div className="unassigned-banner"><span><AlertTriangle size={15} /> ยังไม่จัดรถ</span><b>{unassigned.id} · {unassigned.customer}</b><button onClick={() => onUpdateBooking({ ...unassigned, vehicle: 'รถดูดสูญญากาศ 10 ลบ.ม.', driver: 'สมชาย ใจดี', status: 'ยืนยันแล้ว' })}>จัดรถให้รายการนี้</button></div>}<div className="dispatch-grid"><div className="resource-head">ทรัพยากร / เวลา</div>{slots.map((slot) => <div className="slot-head" key={slot}>{slot}</div>)}{resources.map((resource) => <div className="dispatch-row" key={resource}><div className="resource-name"><Truck size={15} /><span>{resource}</span></div>{slots.map((slot) => { const [start] = slot.split('–'); const booking = bookings.find((item) => item.vehicle === resource && item.start === start); return <button className={booking ? 'dispatch-cell filled' : 'dispatch-cell'} key={`${resource}-${slot}`} onClick={() => booking ? onSelectBooking(booking) : notify(`ยังไม่มีงานใน ${slot}`)}>{booking ? <><b>{booking.customer}</b><small>{booking.service}</small><em className={`stage-label ${stageClass[booking.stage]}`}>{booking.stage}</em></> : <span>ว่าง</span>}</button>; })}</div>)}</div></section>;
+  const matchesResourceType = (booking: Booking, resource: VehicleResource) => {
+    if (booking.vehicle === 'ยังไม่จัดรถ') return false;
+    if (booking.vehicleId) return booking.vehicleId === resource.id;
+    const bookingType = booking.vehicleType ?? booking.vehicle;
+    return bookingType === resource.type || bookingType.includes(resource.type) || resource.type.includes(bookingType);
+  };
+  const bookingForCell = (resource: VehicleResource, slot: string) => {
+    const [start] = slot.split('–');
+    const direct = bookings.find((booking) => booking.vehicleId === resource.id && booking.start === start);
+    if (direct) return direct;
+    const sameTypeResources = resources.filter((item) => item.type === resource.type);
+    const resourceIndex = sameTypeResources.findIndex((item) => item.id === resource.id);
+    return bookings.filter((booking) => matchesResourceType(booking, resource) && booking.start === start)[resourceIndex];
+  };
+  const statusClassForVehicle = (status: VehicleResource['status']) => status === 'ว่าง' ? 'fleet-available' : status === 'ซ่อมบำรุง' ? 'fleet-maintenance' : status === 'กำลังใช้งาน' ? 'fleet-busy' : 'fleet-maintenance';
+  return <section className="panel dispatch-panel"><div className="panel-head"><div><h3>จัดคิวรายวัน · {formatThaiDate(date)}</h3><p>แยกเป็นรถรายคัน เพื่อเห็นงานซ้อนเวลาและรถที่ยังว่างทันที</p></div><span className="dispatch-summary">{bookings.length} งาน · {resources.length} รถ</span></div>{unassigned && <div className="unassigned-banner"><span><AlertTriangle size={15} /> ยังไม่จัดรถ</span><b>{unassigned.id} · {unassigned.customer}</b><button onClick={() => onUpdateBooking({ ...unassigned, vehicle: 'รถดูดสูญญากาศ 10 ลบ.ม.', driver: 'สมชาย ใจดี', status: 'ยืนยันแล้ว' })}>จัดรถให้รายการนี้</button></div>}<div className="dispatch-grid"><div className="resource-head">รถรายคัน / เวลา</div>{slots.map((slot) => <div className="slot-head" key={slot}>{slot}</div>)}{resources.map((resource) => <div className="dispatch-row" key={resource.id}><div className="resource-name"><Truck size={16} /><span><b>{resource.registrationNumber}</b><small>{resource.type}</small></span><em className={`fleet-status ${statusClassForVehicle(resource.status)}`}>{resource.status}</em></div>{slots.map((slot) => { const booking = bookingForCell(resource, slot); return <button className={booking ? 'dispatch-cell filled' : 'dispatch-cell'} key={`${resource.id}-${slot}`} onClick={() => booking ? onSelectBooking(booking) : notify(`รถ ${resource.registrationNumber} ว่างใน ${slot}`)}>{booking ? <><b>{booking.customer}</b><small>{booking.service}</small><em className={`stage-label ${stageClass[booking.stage]}`}>{booking.stage}</em></> : <span>ว่าง</span>}</button>; })}</div>)}</div></section>;
 }
 
-function FleetView({ bookings, notify }: { bookings: Booking[]; notify: (message: string) => void }) {
-  const fleet = [{ name: 'รถดูดสูญญากาศ 10 ลบ.ม.', type: 'รถดูดสูญญากาศ', status: 'กำลังใช้งาน', next: 'BK-260829-018', tone: 'teal' }, { name: 'รถขนกากอุตสาหกรรม', type: 'รถขนส่งกาก', status: 'ว่าง', next: 'BK-260829-019', tone: 'amber' }, { name: 'รถดูดตะกอน 6 ลบ.ม.', type: 'รถดูดตะกอน', status: 'กำลังใช้งาน', next: 'BK-260829-020', tone: 'blue' }, { name: 'รถบรรทุกน้ำ 12 ลบ.ม.', type: 'รถบรรทุกน้ำ', status: 'ว่าง', next: 'พรุ่งนี้ 09:00', tone: 'violet' }, { name: 'รถดูดสูญญากาศ 6 ลบ.ม.', type: 'รถดูดสูญญากาศ', status: 'ซ่อมบำรุง', next: 'กลับมา 2 ก.ย.', tone: 'rose' }];
-  return <><PageHeader eyebrow="Company Operations Center · Fleet" title="รถและทีมงาน" copy="ตรวจความพร้อมและตารางงานของทุกทรัพยากร" action={<button className="primary-button" onClick={() => notify('ฟอร์มเพิ่มรถจะเปิดในเวอร์ชันถัดไป')}><Plus size={17} /> เพิ่มรถ</button>} /><div className="fleet-summary"><Metric label="รถทั้งหมด" value="18" note="คันในระบบ" tone="teal" icon={<Truck size={17} />} /><Metric label="พร้อมใช้งาน" value="12" note="66% ของ fleet" tone="blue" icon={<Check size={17} />} /><Metric label="กำลังใช้งาน" value="04" note="ในงานวันนี้" tone="amber" icon={<Clock3 size={17} />} /><Metric label="ซ่อมบำรุง" value="02" note="มีตารางซ่อม" tone="rose" icon={<Settings2 size={17} />} /></div><section className="panel fleet-table-panel"><div className="panel-head"><div><h3>สถานะรถ</h3><p>อัปเดตตาม Booking และ maintenance schedule</p></div><button className="filter-button"><Filter size={15} /> ตัวกรอง</button></div><div className="fleet-grid">{fleet.map((item) => <div className="fleet-card" key={item.name}><div className={`fleet-symbol ${item.tone}`}><Truck size={20} /></div><div className="fleet-card-main"><b>{item.name}</b><small>{item.type}</small><span>งานถัดไป: {item.next}</span></div><div><em className={`fleet-status ${item.status === 'ว่าง' ? 'fleet-available' : item.status === 'ซ่อมบำรุง' ? 'fleet-maintenance' : 'fleet-busy'}`}>{item.status}</em><button className="icon-button small" onClick={() => notify(`เปิดรายละเอียด ${item.name}`)}><MoreHorizontal size={16} /></button></div></div>)}</div></section><section className="panel fleet-note"><AlertTriangle size={16} /><span>มีรถ 1 คันที่ต้องตรวจสอบ maintenance schedule ก่อนจัดคิววันที่ 2 ก.ย.</span><button className="quiet-button" onClick={() => notify('เปิด maintenance schedule')}>ดูรายละเอียด <ArrowRight size={15} /></button></section><span className="sr-only">มีข้อมูล Booking {bookings.length} รายการ</span></>;
+function FleetView({ bookings, vehicles, notify }: { bookings: Booking[]; vehicles: VehicleResource[]; notify: (message: string) => void }) {
+  const available = vehicles.filter((item) => item.status === 'ว่าง').length;
+  const busy = vehicles.filter((item) => item.status === 'กำลังใช้งาน').length;
+  const maintenance = vehicles.filter((item) => item.status === 'ซ่อมบำรุง').length;
+  const tones = ['teal', 'amber', 'blue', 'violet', 'rose'];
+  const statusClassForVehicle = (status: VehicleResource['status']) => status === 'ว่าง' ? 'fleet-available' : status === 'ซ่อมบำรุง' ? 'fleet-maintenance' : status === 'กำลังใช้งาน' ? 'fleet-busy' : 'fleet-maintenance';
+  return <><PageHeader eyebrow="Company Operations Center · Fleet" title="รถและทีมงาน" copy="ดูรถเป็นรายคัน และรู้ทันทีว่าคันไหนว่างรับงานซ้อนเวลา" action={<button className="primary-button" onClick={() => notify('ฟอร์มเพิ่มรถจะเปิดในเวอร์ชันถัดไป')}><Plus size={17} /> เพิ่มรถ</button>} /><div className="fleet-summary"><Metric label="รถทั้งหมด" value={String(vehicles.length).padStart(2, '0')} note="คันในระบบ" tone="teal" icon={<Truck size={17} />} /><Metric label="พร้อมใช้งาน" value={String(available).padStart(2, '0')} note="รับงานเพิ่มได้" tone="blue" icon={<Check size={17} />} /><Metric label="กำลังใช้งาน" value={String(busy).padStart(2, '0')} note="มีงานที่กำลังจัด" tone="amber" icon={<Clock3 size={17} />} /><Metric label="ซ่อมบำรุง" value={String(maintenance).padStart(2, '0')} note="ยังจัดงานไม่ได้" tone="rose" icon={<Settings2 size={17} />} /></div><section className="panel fleet-table-panel"><div className="panel-head"><div><h3>สถานะรถรายคัน</h3><p>รถชนิดเดียวกันมีหลายคัน จึงรองรับงานเวลาเดียวกันได้</p></div><button className="filter-button"><Filter size={15} /> ตัวกรอง</button></div><div className="fleet-grid">{vehicles.map((item, index) => <div className="fleet-card" key={item.id}><div className={`fleet-symbol ${tones[index % tones.length]}`}><Truck size={20} /></div><div className="fleet-card-main"><b>{item.registrationNumber} · {item.name}</b><small>{item.type}</small><span>{item.bookingId ? 'มีงานกำลังจัดอยู่' : 'พร้อมรับงานเพิ่ม'}</span></div><div><em className={`fleet-status ${statusClassForVehicle(item.status)}`}>{item.status}</em><button className="icon-button small" onClick={() => notify(`เปิดรายละเอียด ${item.registrationNumber}`)}><MoreHorizontal size={16} /></button></div></div>)}</div></section><section className="panel fleet-note"><AlertTriangle size={16} /><span>การจองช่วงเวลาเดียวกันจะแยกรถเป็นคนละคันโดยอัตโนมัติตาม capacity ที่ว่าง</span><button className="quiet-button" onClick={() => notify('เปิด maintenance schedule')}>ดูรายละเอียด <ArrowRight size={15} /></button></section><span className="sr-only">มีข้อมูล Booking {bookings.length} รายการ</span></>;
 }
 
 function CustomersView({ bookings, onSelectBooking }: { bookings: Booking[]; onSelectBooking: (booking: Booking) => void }) {

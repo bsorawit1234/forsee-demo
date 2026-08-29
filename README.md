@@ -14,6 +14,7 @@
 - PostgreSQL 16 + Prisma 6
 - Versioned migrations ใน `packages/database/prisma/migrations`
 - Versioned idempotent seeds ใน `packages/database/seeds/versions`
+- Fleet capacity คำนวณจากรถรายคันใน `Vehicle` ทำให้รถชนิดเดียวกันรับงานเวลาเดียวกันได้หลายคัน
 - Orval generated client ใน `packages/api-client/src/generated`
 - Docker Compose + Nginx reverse proxy + SSE operations events
 
@@ -40,6 +41,8 @@ docker compose -f infra/compose.yaml --profile seed run --build --rm seed
 ```
 
 Compose แยก `migrate` เป็น one-off job และให้ `api` เริ่มหลัง migration สำเร็จ ไม่ให้ replica แต่ละตัวแข่งกัน migrate เอง
+
+Seed `004_core_fleet_units` เพิ่มรถหลายคันต่อประเภทรถ และ availability จะหักรถที่อยู่ใน maintenance ตามช่วงเวลาที่เลือก
 
 ## คำสั่งตรวจสอบ
 
