@@ -1,0 +1,10 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Foresee Reservation API",
+    "description": "Booking and operations API for Foresee Corporation",
+    "version": "1.0"
+  },
+  "paths": {},
+  "components": {}
+}

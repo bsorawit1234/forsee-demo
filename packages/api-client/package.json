@@ -1,0 +1,14 @@
+{
+  "name": "@forsee/api-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "generate": "orval --config orval.config.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "orval": "^7.17.0",
+    "typescript": "^5.9.3"
+  }
+}

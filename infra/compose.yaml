@@ -1,0 +1,45 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-forsee}
+      POSTGRES_USER: ${POSTGRES_USER:-forsee}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-forsee_local}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - forsee_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  api:
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    environment:
+      NODE_ENV: development
+      API_PORT: 3000
+      WEB_ORIGIN: http://localhost:5173
+      DATABASE_URL: postgresql://${POSTGRES_USER:-forsee}:${POSTGRES_PASSWORD:-forsee_local}@postgres:5432/${POSTGRES_DB:-forsee}?schema=public
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+    ports:
+      - "5173:80"
+    depends_on:
+      api:
+        condition: service_started
+
+volumes:
+  forsee_postgres_data:

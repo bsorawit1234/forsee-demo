@@ -1,39 +1,29 @@
 {
-  "name": "sites-project",
+  "name": "forsee-platform",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@11.14.0",
   "engines": {
     "node": ">=22.13.0"
   },
   "scripts": {
-    "dev": "vinext dev",
-    "build": "vinext build",
-    "start": "vinext start",
-    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next"
-  },
-  "dependencies": {
-    "next": "16.2.6",
-    "react": "19.2.6",
-    "react-dom": "19.2.6"
-  },
-  "devDependencies": {
-    "@cloudflare/vite-plugin": "1.37.1",
-    "@cloudflare/workers-types": "4.20260515.1",
-    "@openai/sites-vite-plugin": "^0.1.0 || ^0.2.0",
-    "@tailwindcss/postcss": "4.2.1",
-    "@types/node": "22.19.19",
-    "@types/react": "19.2.14",
-    "@types/react-dom": "19.2.3",
-    "@vitejs/plugin-react": "6.0.2",
-    "@vitejs/plugin-rsc": "0.5.26",
-    "eslint": "9.39.4",
-    "eslint-config-next": "16.2.6",
-    "react-server-dom-webpack": "19.2.6",
-    "tailwindcss": "4.2.1",
-    "typescript": "5.9.3",
-    "vinext": "1.0.0-beta.3",
-    "vite": "8.0.13",
-    "wrangler": "4.92.0"
+    "dev": "pnpm --parallel --filter @forsee/web --filter @forsee/api dev",
+    "dev:web": "pnpm --filter @forsee/web dev",
+    "dev:api": "pnpm --filter @forsee/api dev",
+    "build": "pnpm build:web && pnpm build:api",
+    "build:web": "pnpm --filter @forsee/web build",
+    "build:api": "pnpm --filter @forsee/api build",
+    "start:web": "pnpm --filter @forsee/web preview",
+    "start:api": "pnpm --filter @forsee/api start",
+    "lint": "pnpm --parallel --filter @forsee/web --filter @forsee/api lint",
+    "typecheck": "pnpm --parallel --filter @forsee/web --filter @forsee/api typecheck",
+    "test": "pnpm --parallel --filter @forsee/web --filter @forsee/api test",
+    "db:generate": "pnpm --filter @forsee/database generate",
+    "db:migrate:dev": "pnpm --filter @forsee/database migrate:dev",
+    "db:migrate:deploy": "pnpm --filter @forsee/database migrate:deploy",
+    "db:seed": "pnpm --filter @forsee/database seed:apply",
+    "api:openapi": "pnpm --filter @forsee/api openapi",
+    "api:client": "pnpm --filter @forsee/api-client generate"
   },
   "type": "module"
 }

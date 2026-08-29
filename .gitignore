@@ -36,3 +36,10 @@ next-env.d.ts
 /.wrangler/
 /outputs/
 /work/
+
+# monorepo build output
+/apps/*/dist/
+/apps/*/coverage/
+/packages/*/dist/
+/packages/*/generated/
+/tmp/
