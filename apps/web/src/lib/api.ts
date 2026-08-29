@@ -31,6 +31,23 @@ export type ApiVehicle = {
 
 export type ApiVehiclesResponse = { items: ApiVehicle[] };
 
+export type ApiAvailabilitySlot = {
+  start: string;
+  end: string;
+  capacity: number;
+  available: boolean;
+  remaining: number;
+};
+
+export type ApiAvailabilityResponse = {
+  date: string;
+  serviceCode: string;
+  vehicleType?: string;
+  fleetSize: number;
+  capacity: number;
+  slots: ApiAvailabilitySlot[];
+};
+
 const enabled = import.meta.env.VITE_API_ENABLED === 'true';
 
 export function isApiEnabled() {
@@ -51,6 +68,13 @@ export function fetchOperationsBookings() {
 export function fetchOperationsVehicles() {
   if (!enabled) return Promise.reject(new Error('API disabled for demo mode'));
   return request<ApiVehiclesResponse>('/api/v1/ops/vehicles');
+}
+
+export function fetchCustomerAvailability(serviceCode: string, date: string, customerSiteId?: string) {
+  if (!enabled) return Promise.reject(new Error('API disabled for demo mode'));
+  const params = new URLSearchParams({ serviceCode, date });
+  if (customerSiteId) params.set('customerSiteId', customerSiteId);
+  return request<ApiAvailabilityResponse>(`/api/v1/catalog/customer/availability?${params.toString()}`);
 }
 
 export function submitCustomerBooking(payload: { serviceCode: string; customerSiteId: string; requestedDate: string; requestedStart: string; requestedEnd: string; estimatedVolume?: number; customerNote?: string }) {
