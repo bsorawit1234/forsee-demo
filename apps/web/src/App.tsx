@@ -86,7 +86,8 @@ const stageClass: Record<JobStage, string> = {
 function toUiBooking(item: ApiBooking): Booking {
   const start = new Date(item.requestedStartAt);
   const end = new Date(item.requestedEndAt);
-  const thaiDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok', year: 'numeric', month: '2-digit', day: '2-digit' }).format(start);
+  const dateParts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Bangkok', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(start).reduce<Record<string, string>>((parts, part) => { parts[part.type] = part.value; return parts; }, {});
+  const thaiDate = `${dateParts.year}-${dateParts.month}-${dateParts.day}`;
   const clock = (value: Date) => new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit', hour12: false }).format(value);
   const statuses: Record<string, BookingStatus> = { PENDING_CONFIRMATION: 'รอยืนยัน', CONFIRMED: 'ยืนยันแล้ว', REJECTED: 'รอยืนยัน', CANCELLED: 'เสร็จสิ้น' };
   const stages: Record<string, JobStage> = { SCHEDULED: 'รอเริ่มงาน', EN_ROUTE: 'กำลังเดินทาง', ARRIVED: 'ถึงหน้างาน', IN_SERVICE: 'กำลังให้บริการ', COMPLETED: 'เสร็จสิ้น' };
