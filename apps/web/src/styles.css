@@ -506,3 +506,33 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
   .app-frame > .sidebar::-webkit-scrollbar { width: 6px; }
   .app-frame > .sidebar::-webkit-scrollbar-thumb { border-radius: 6px; background: #4f7f75; }
 }
+
+/* Full-month operations calendar: scan capacity first, then open a day dispatch. */
+.company-month-capacity { overflow: hidden; border-radius: 12px; }
+.company-calendar-weekdays, .company-month-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.company-calendar-weekdays { border-bottom: 1px solid #e4ece8; background: #fbfcfc; }
+.company-calendar-weekdays span { padding: 12px 10px; color: #8da39c; font-size: 11px; font-weight: 700; text-align: center; }
+.company-month-grid { gap: 1px; background: #e1eae6; }
+.company-month-cell { position: relative; min-height: 142px; display: flex; flex-direction: column; align-items: flex-start; gap: 7px; padding: 14px; border: 0; color: #78918a; background: #fff; text-align: left; }
+.company-month-cell:hover:not(:disabled) { background: #f4fbf8; }
+.company-month-cell.selected { background: #effaf6; box-shadow: inset 0 0 0 2px #0b7f6d; }
+.company-month-cell.outside { min-height: 42px; background: #fbfcfb; cursor: default; }
+.company-month-cell > span { color: #35534b; font-size: 20px; font-weight: 700; line-height: 1; }
+.company-month-cell > b { color: #55776c; font-size: 11px; font-weight: 700; }
+.company-month-cell > small { color: #8aa49b; font-size: 10px; }
+.company-month-cell > em { margin-top: auto; color: #78a092; font-size: 9px; font-style: normal; }
+.company-day-capacity { width: 100%; height: 7px; overflow: hidden; border-radius: 5px; background: #edf3f0; }
+.company-day-capacity i { display: block; height: 100%; border-radius: inherit; background: #6bc3aa; }
+.company-month-cell::after { position: absolute; top: 17px; right: 15px; width: 7px; height: 7px; border-radius: 50%; background: #6bc3aa; content: ''; }
+.company-month-cell.selected::after { background: #0b7f6d; box-shadow: 0 0 0 3px #c6ebdf; }
+.company-month-cell.outside::after { display: none; }
+@media (max-width: 760px) {
+  .company-calendar-weekdays span { padding: 9px 2px; font-size: 9px; }
+  .company-month-cell { min-height: 92px; gap: 5px; padding: 9px 6px; }
+  .company-month-cell.outside { min-height: 30px; }
+  .company-month-cell > span { font-size: 16px; }
+  .company-month-cell > b { font-size: 9px; }
+  .company-month-cell > small, .company-month-cell > em { font-size: 7px; }
+  .company-month-cell::after { top: 9px; right: 6px; width: 6px; height: 6px; }
+  .company-day-capacity { height: 5px; }
+}

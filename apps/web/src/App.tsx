@@ -298,15 +298,32 @@ function Activity({ name, text, time, tone }: { name: string; text: string; time
 
 function OperationsCalendar({ bookings, vehicles, onSelectBooking, onUpdateBooking, notify }: { bookings: Booking[]; vehicles: VehicleResource[]; onSelectBooking: (booking: Booking) => void; onUpdateBooking: (booking: Booking) => void; notify: (message: string) => void }) {
   const [selectedDate, setSelectedDate] = useState('2026-08-29');
-  const [calendarMode, setCalendarMode] = useState<'week' | 'day'>('week');
-  const week = ['2026-08-29', '2026-08-30', '2026-08-31', '2026-09-01', '2026-09-02'];
+  const [calendarMode, setCalendarMode] = useState<'month' | 'day'>('month');
+  const [calendarMonth, setCalendarMonth] = useState({ year: 2026, month: 7 });
   const selectedBookings = bookings.filter((booking) => booking.date === selectedDate);
   const assignable = selectedBookings.find((booking) => booking.vehicle === 'ยังไม่จัดรถ');
+  const monthLabel = useMemo(() => new Intl.DateTimeFormat('th-TH', { month: 'long', year: 'numeric' }).format(new Date(calendarMonth.year, calendarMonth.month, 1)), [calendarMonth]);
+  const monthCells = useMemo(() => {
+    const firstWeekday = new Date(calendarMonth.year, calendarMonth.month, 1).getDay();
+    const totalDays = new Date(calendarMonth.year, calendarMonth.month + 1, 0).getDate();
+    const totalCells = Math.ceil((firstWeekday + totalDays) / 7) * 7;
+    return Array.from({ length: totalCells }, (_, index) => {
+      if (index < firstWeekday || index >= firstWeekday + totalDays) return { key: `empty-${index}`, date: '', day: '', bookings: [], isCurrentMonth: false };
+      const day = index - firstWeekday + 1;
+      const date = `${calendarMonth.year}-${String(calendarMonth.month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      return { key: date, date, day: String(day), bookings: bookings.filter((booking) => booking.date === date), isCurrentMonth: true };
+    });
+  }, [bookings, calendarMonth]);
+  const changeMonth = (offset: number) => {
+    const next = new Date(calendarMonth.year, calendarMonth.month + offset, 1);
+    setCalendarMonth({ year: next.getFullYear(), month: next.getMonth() });
+    setSelectedDate(`${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-01`);
+  };
   return <>
     <PageHeader eyebrow="Company Operations Center · Scheduling" title="ปฏิทินและจัดคิว" copy="รถแต่ละประเภทมีหลายคัน จึงรับงานช่วงเวลาเดียวกันได้ตามจำนวนรถที่ว่าง" action={<button className="primary-button" onClick={() => notify('ช่องสร้าง Booking จะเปิดจาก Booking Monitor')}><Plus size={17} /> สร้างการจอง</button>} />
-    <div className="calendar-toolbar"><div className="date-navigation"><button className="icon-button small"><ArrowLeft size={16} /></button><button className="today-button" onClick={() => setSelectedDate('2026-08-29')}>วันนี้</button><button className="icon-button small"><ArrowRight size={16} /></button><b>29 ส.ค. – 2 ก.ย. 2569</b></div><div className="calendar-capacity-summary"><Truck size={15} /> {vehicles.length} คันใน fleet · จองซ้อนเวลาได้ตามรถว่าง</div><div className="view-switch"><button className={calendarMode === 'week' ? 'selected' : ''} onClick={() => setCalendarMode('week')}>Week capacity</button><button className={calendarMode === 'day' ? 'selected' : ''} onClick={() => setCalendarMode('day')}>Day dispatch</button></div><button className="filter-button"><Filter size={15} /> กรอง</button></div>
-    {calendarMode === 'week' ? <section className="panel week-capacity"><div className="week-grid">{week.map((date) => { const dateBookings = bookings.filter((booking) => booking.date === date); const isSelected = selectedDate === date; const unassignedCount = dateBookings.filter((booking) => booking.vehicle === 'ยังไม่จัดรถ').length; return <button key={date} className={isSelected ? 'week-day selected' : 'week-day'} onClick={() => { setSelectedDate(date); setCalendarMode('day'); }}><span>{new Intl.DateTimeFormat('th-TH', { weekday: 'short' }).format(new Date(`${date}T00:00:00`))}</span><b>{new Intl.DateTimeFormat('th-TH', { day: 'numeric' }).format(new Date(`${date}T00:00:00`))}</b><small>{dateBookings.length} งาน · {vehicles.length} รถ</small><div className="day-capacity"><i style={{ width: `${Math.min(100, 18 + dateBookings.length * 23)}%` }} /></div><em>{unassignedCount ? `${unassignedCount} ยังไม่จัดรถ` : 'รถพร้อมรับงานซ้อน'}</em></button>; })}</div></section> : <DayDispatch date={selectedDate} bookings={selectedBookings} resources={vehicles} unassigned={assignable} onSelectBooking={onSelectBooking} onUpdateBooking={onUpdateBooking} notify={notify} />}
-    {calendarMode === 'week' && <div className="calendar-hint"><CalendarDays size={16} /><span>เลือกวันที่เพื่อเปิด Day dispatch และจัดรถตามช่วงเวลา</span></div>}
+    <div className="calendar-toolbar"><div className="date-navigation"><button className="icon-button small" aria-label="เดือนก่อนหน้า" onClick={() => changeMonth(-1)}><ArrowLeft size={16} /></button><button className="today-button" onClick={() => { setCalendarMonth({ year: 2026, month: 7 }); setSelectedDate('2026-08-29'); setCalendarMode('month'); }}>วันนี้</button><button className="icon-button small" aria-label="เดือนถัดไป" onClick={() => changeMonth(1)}><ArrowRight size={16} /></button><b>{monthLabel}</b></div><div className="calendar-capacity-summary"><Truck size={15} /> {vehicles.length} คันใน fleet · จองซ้อนเวลาได้ตามรถว่าง</div><div className="view-switch"><button className={calendarMode === 'month' ? 'selected' : ''} onClick={() => setCalendarMode('month')}>Month overview</button><button className={calendarMode === 'day' ? 'selected' : ''} onClick={() => setCalendarMode('day')}>Day dispatch</button></div><button className="filter-button"><Filter size={15} /> กรอง</button></div>
+    {calendarMode === 'month' ? <section className="panel company-month-capacity"><div className="company-calendar-weekdays">{['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'].map((weekday) => <span key={weekday}>{weekday}</span>)}</div><div className="company-month-grid">{monthCells.map((cell) => { const unassignedCount = cell.bookings.filter((booking) => booking.vehicle === 'ยังไม่จัดรถ').length; const activeCount = cell.bookings.length; return <button key={cell.key} disabled={!cell.isCurrentMonth} aria-label={cell.isCurrentMonth ? `${cell.day} ${activeCount} งาน` : undefined} className={`company-month-cell ${cell.isCurrentMonth ? '' : 'outside'} ${selectedDate === cell.date ? 'selected' : ''}`} onClick={() => { setSelectedDate(cell.date); setCalendarMode('day'); }}><span>{cell.day}</span>{cell.isCurrentMonth && <><b>{activeCount} งาน</b><small>{Math.max(vehicles.length - Math.min(activeCount, vehicles.length), 0)} รถว่าง</small><div className="company-day-capacity"><i style={{ width: `${Math.min(100, activeCount ? 18 + activeCount * 18 : 8)}%` }} /></div>{unassignedCount ? <em>{unassignedCount} ยังไม่จัดรถ</em> : <em>รองรับงานซ้อน</em>}</>}</button>; })}</div></section> : <DayDispatch date={selectedDate} bookings={selectedBookings} resources={vehicles} unassigned={assignable} onSelectBooking={onSelectBooking} onUpdateBooking={onUpdateBooking} notify={notify} />}
+    {calendarMode === 'month' && <div className="calendar-hint"><CalendarDays size={16} /><span>เลือกวันที่เพื่อเปิด Day dispatch และจัดรถตามช่วงเวลา</span></div>}
   </>;
 }
 
