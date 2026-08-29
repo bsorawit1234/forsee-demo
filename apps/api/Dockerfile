@@ -17,12 +17,15 @@ COPY packages/database ./packages/database
 RUN pnpm --filter @forsee/database generate
 RUN pnpm --filter @forsee/api build
 
+FROM build AS runtime-deps
+RUN pnpm deploy --filter @forsee/api --prod --legacy /prod/api
+
 FROM node:22-alpine AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=build /workspace/apps/api/dist ./dist
-COPY --from=build /workspace/apps/api/package.json ./package.json
-COPY --from=build /workspace/node_modules ./node_modules
+COPY --from=runtime-deps /prod/api/package.json ./package.json
+COPY --from=runtime-deps /prod/api/node_modules ./node_modules
 COPY --from=build /workspace/packages/database/prisma ./prisma
 COPY --from=build /workspace/packages/database/seeds ./seeds
 EXPOSE 3000
