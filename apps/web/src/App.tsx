@@ -126,9 +126,12 @@ function toUiVehicle(item: ApiVehicle): VehicleResource {
 }
 
 export default function App() {
-  const [portal, setPortal] = useState<Portal>('company');
+  const initialPath = typeof window === 'undefined' ? '/' : window.location.pathname;
+  const initialPortal: Portal = initialPath.startsWith('/marketing') ? 'customer' : 'company';
+  const initialCustomerView: CustomerView = initialPath.endsWith('/bookings') ? 'bookings' : initialPath.endsWith('/company') ? 'company' : 'new-booking';
+  const [portal, setPortal] = useState<Portal>(initialPortal);
   const [companyView, setCompanyView] = useState<CompanyView>('overview');
-  const [customerView, setCustomerView] = useState<CustomerView>('new-booking');
+  const [customerView, setCustomerView] = useState<CustomerView>(initialCustomerView);
   const [bookings, setBookings] = useState(seedBookings);
   const [vehicles, setVehicles] = useState(demoVehicles);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
