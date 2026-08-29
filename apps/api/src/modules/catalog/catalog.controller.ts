@@ -1,5 +1,5 @@
-import { BadRequestException, Controller, Get, Query, Req, UseGuards } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { BadRequestException, Body, Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { ApiBody, ApiTags } from '@nestjs/swagger';
 import { PrismaService } from '../../database/prisma.service.js';
 import type { AuthenticatedRequest } from '../../common/request-user.js';
 import { SessionGuard } from '../auth/session.guard.js';
@@ -51,5 +51,13 @@ export class CatalogController {
       slots.push({ start: start.toISOString(), end: end.toISOString(), available: used < capacity, remaining: Math.max(capacity - used, 0) });
     }
     return { date: query.date, serviceCode: service.code, capacity, slots };
+  }
+
+  @Post('customer/availability/query')
+  @ApiBody({ type: AvailabilityQueryDto })
+  @UseGuards(SessionGuard, RolesGuard)
+  @Roles('CUSTOMER')
+  availabilityQuery(@Req() request: AuthenticatedRequest, @Body() query: AvailabilityQueryDto) {
+    return this.availability(request, query);
   }
 }

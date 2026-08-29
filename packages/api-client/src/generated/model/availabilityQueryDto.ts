@@ -6,7 +6,8 @@
  * OpenAPI spec version: 1.0
  */
 
-export * from './assignBookingDto';
-export * from './availabilityQueryDto';
-export * from './createBookingDto';
-export * from './loginDto';
+export interface AvailabilityQueryDto {
+  date: string;
+  serviceCode: string;
+  customerSiteId?: string;
+}

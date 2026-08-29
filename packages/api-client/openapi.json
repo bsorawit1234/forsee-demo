@@ -128,6 +128,30 @@
         ]
       }
     },
+    "/api/v1/catalog/customer/availability/query": {
+      "post": {
+        "operationId": "CatalogController_availabilityQuery",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AvailabilityQueryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
     "/api/v1/customer/bookings": {
       "get": {
         "operationId": "BookingController_customerList",
@@ -524,6 +548,27 @@
         "required": [
           "email",
           "password"
+        ]
+      },
+      "AvailabilityQueryDto": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "example": "2026-09-01"
+          },
+          "serviceCode": {
+            "type": "string",
+            "example": "GREASE_TRAP"
+          },
+          "customerSiteId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "date",
+          "serviceCode"
         ]
       },
       "CreateBookingDto": {

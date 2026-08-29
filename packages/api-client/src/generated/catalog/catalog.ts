@@ -6,19 +6,27 @@
  * OpenAPI spec version: 1.0
  */
 import {
+  useMutation,
   useQuery
 } from '@tanstack/react-query';
 import type {
   DataTag,
   DefinedInitialDataOptions,
   DefinedUseQueryResult,
+  MutationFunction,
   QueryClient,
   QueryFunction,
   QueryKey,
   UndefinedInitialDataOptions,
+  UseMutationOptions,
+  UseMutationResult,
   UseQueryOptions,
   UseQueryResult
 } from '@tanstack/react-query';
+
+import type {
+  AvailabilityQueryDto
+} from '.././model';
 
 
 
@@ -360,3 +368,87 @@ export function useCatalogControllerAvailability<TData = Awaited<ReturnType<type
 
 
 
+export type catalogControllerAvailabilityQueryResponse201 = {
+  data: void
+  status: 201
+}
+    
+export type catalogControllerAvailabilityQueryResponseSuccess = (catalogControllerAvailabilityQueryResponse201) & {
+  headers: Headers;
+};
+;
+
+export type catalogControllerAvailabilityQueryResponse = (catalogControllerAvailabilityQueryResponseSuccess)
+
+export const getCatalogControllerAvailabilityQueryUrl = () => {
+
+
+  
+
+  return `/api/v1/catalog/customer/availability/query`
+}
+
+export const catalogControllerAvailabilityQuery = async (availabilityQueryDto: AvailabilityQueryDto, options?: RequestInit): Promise<catalogControllerAvailabilityQueryResponse> => {
+  
+  const res = await fetch(getCatalogControllerAvailabilityQueryUrl(),
+  {      
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      availabilityQueryDto,)
+  }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+  
+  const data: catalogControllerAvailabilityQueryResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as catalogControllerAvailabilityQueryResponse
+}
+
+
+
+
+export const getCatalogControllerAvailabilityQueryMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof catalogControllerAvailabilityQuery>>, TError,{data: AvailabilityQueryDto}, TContext>, fetch?: RequestInit}
+): UseMutationOptions<Awaited<ReturnType<typeof catalogControllerAvailabilityQuery>>, TError,{data: AvailabilityQueryDto}, TContext> => {
+
+const mutationKey = ['catalogControllerAvailabilityQuery'];
+const {mutation: mutationOptions, fetch: fetchOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, fetch: undefined};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof catalogControllerAvailabilityQuery>>, {data: AvailabilityQueryDto}> = (props) => {
+          const {data} = props ?? {};
+
+          return  catalogControllerAvailabilityQuery(data,fetchOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CatalogControllerAvailabilityQueryMutationResult = NonNullable<Awaited<ReturnType<typeof catalogControllerAvailabilityQuery>>>
+    export type CatalogControllerAvailabilityQueryMutationBody = AvailabilityQueryDto
+    export type CatalogControllerAvailabilityQueryMutationError = unknown
+
+    export const useCatalogControllerAvailabilityQuery = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof catalogControllerAvailabilityQuery>>, TError,{data: AvailabilityQueryDto}, TContext>, fetch?: RequestInit}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof catalogControllerAvailabilityQuery>>,
+        TError,
+        {data: AvailabilityQueryDto},
+        TContext
+      > => {
+
+      const mutationOptions = getCatalogControllerAvailabilityQueryMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    
