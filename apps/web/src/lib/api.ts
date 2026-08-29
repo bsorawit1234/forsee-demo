@@ -65,6 +65,11 @@ export function fetchOperationsBookings() {
   return request<ApiBookingsResponse>(getBookingControllerOpsListUrl());
 }
 
+export function confirmOperationBooking(id: string) {
+  if (!enabled) return Promise.reject(new Error('API disabled for demo mode'));
+  return request<ApiBooking>(`/api/v1/ops/bookings/${id}/confirm`, { method: 'POST' });
+}
+
 export function fetchOperationsVehicles() {
   if (!enabled) return Promise.reject(new Error('API disabled for demo mode'));
   return request<ApiVehiclesResponse>('/api/v1/ops/vehicles');

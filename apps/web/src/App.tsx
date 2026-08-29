@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { fetchCustomerAvailability, fetchOperationsBookings, fetchOperationsVehicles, isApiEnabled, submitCustomerBooking, watchOperationEvents, type ApiAvailabilityResponse, type ApiBooking, type ApiVehicle } from './lib/api';
+import { confirmOperationBooking, fetchCustomerAvailability, fetchOperationsBookings, fetchOperationsVehicles, isApiEnabled, submitCustomerBooking, watchOperationEvents, type ApiAvailabilityResponse, type ApiBooking, type ApiVehicle } from './lib/api';
 import { formatThaiDate } from './lib/format';
 import {
   AlertTriangle,
@@ -36,6 +36,7 @@ type JobStage = 'รอเริ่มงาน' | 'กำลังเดิน�
 
 type Booking = {
   id: string;
+  recordId?: string;
   customer: string;
   service: string;
   site: string;
@@ -117,7 +118,7 @@ function toUiBooking(item: ApiBooking): Booking {
   const statuses: Record<string, BookingStatus> = { PENDING_CONFIRMATION: 'รอยืนยัน', CONFIRMED: 'ยืนยันแล้ว', REJECTED: 'รอยืนยัน', CANCELLED: 'เสร็จสิ้น' };
   const stages: Record<string, JobStage> = { SCHEDULED: 'รอเริ่มงาน', EN_ROUTE: 'กำลังเดินทาง', ARRIVED: 'ถึงหน้างาน', IN_SERVICE: 'กำลังให้บริการ', COMPLETED: 'เสร็จสิ้น' };
   const status = item.jobStage === 'IN_SERVICE' ? 'กำลังดำเนินการ' : item.jobStage === 'COMPLETED' ? 'เสร็จสิ้น' : statuses[item.bookingStatus] ?? 'ยืนยันแล้ว';
-  return { id: item.bookingNumber, customer: item.customer ?? 'ไม่ระบุลูกค้า', service: item.service ?? 'ไม่ระบุบริการ', site: item.site ?? 'ไม่ระบุสถานที่', date: thaiDate, start: clock(start), end: clock(end), vehicle: item.vehicle ?? 'ยังไม่จัดรถ', vehicleId: item.vehicleId ?? undefined, vehicleRegistrationNumber: item.vehicleRegistrationNumber ?? undefined, vehicleType: item.vehicleType ?? undefined, driver: item.vehicle ? 'ทีมภาคสนาม' : 'ยังไม่จัดทีม', status, stage: stages[item.jobStage] ?? 'รอเริ่มงาน', sla: item.slaHealth === 'OVERDUE' ? 'เกินกำหนด' : item.slaHealth === 'AT_RISK' ? 'ต้องติดตาม' : 'ปกติ' };
+  return { id: item.bookingNumber, recordId: item.id, customer: item.customer ?? 'ไม่ระบุลูกค้า', service: item.service ?? 'ไม่ระบุบริการ', site: item.site ?? 'ไม่ระบุสถานที่', date: thaiDate, start: clock(start), end: clock(end), vehicle: item.vehicle ?? 'ยังไม่จัดรถ', vehicleId: item.vehicleId ?? undefined, vehicleRegistrationNumber: item.vehicleRegistrationNumber ?? undefined, vehicleType: item.vehicleType ?? undefined, driver: item.vehicle ? 'ทีมภาคสนาม' : 'ยังไม่จัดทีม', status, stage: stages[item.jobStage] ?? 'รอเริ่มงาน', sla: item.slaHealth === 'OVERDUE' ? 'เกินกำหนด' : item.slaHealth === 'AT_RISK' ? 'ต้องติดตาม' : 'ปกติ' };
 }
 
 function toUiVehicle(item: ApiVehicle): VehicleResource {
@@ -165,6 +166,24 @@ export default function App() {
     notify(`อัปเดต ${booking.id} แล้ว`);
   };
 
+  const confirmBooking = async (booking: Booking) => {
+    if (isApiEnabled() && booking.recordId) {
+      try {
+        const result = await confirmOperationBooking(booking.recordId);
+        const confirmed = toUiBooking(result);
+        setBookings((current) => current.map((item) => (item.id === booking.id ? confirmed : item)));
+        notify(`ยืนยันข้อมูล ${booking.id} แล้ว`);
+        return true;
+      } catch {
+        notify(`ยืนยัน ${booking.id} ไม่สำเร็จ ลองใหม่อีกครั้ง`);
+        return false;
+      }
+    }
+    setBookings((current) => current.map((item) => (item.id === booking.id ? { ...booking, status: 'ยืนยันแล้ว' } : item)));
+    notify(`ยืนยันข้อมูล ${booking.id} แล้ว`);
+    return true;
+  };
+
   return (
     <div className="platform-shell">
       {portal === 'company' ? (
@@ -176,6 +195,7 @@ export default function App() {
           onNavigate={setCompanyView}
           onSelectBooking={setSelectedBooking}
           onUpdateBooking={updateBooking}
+          onConfirmBooking={confirmBooking}
           onSwitchPortal={switchPortal}
           notify={notify}
         />
@@ -201,6 +221,7 @@ function CompanyPortal({
   onNavigate,
   onSelectBooking,
   onUpdateBooking,
+  onConfirmBooking,
   onSwitchPortal,
   notify,
 }: {
@@ -211,6 +232,7 @@ function CompanyPortal({
   onNavigate: (view: CompanyView) => void;
   onSelectBooking: (booking: Booking | null) => void;
   onUpdateBooking: (booking: Booking) => void;
+  onConfirmBooking: (booking: Booking) => boolean | Promise<boolean>;
   onSwitchPortal: (portal: Portal) => void;
   notify: (message: string) => void;
 }) {
@@ -230,8 +252,8 @@ function CompanyPortal({
       <main className="main-pane">
         <header className="topbar"><button className="mobile-menu" aria-label="เปิดเมนู"><Menu size={20} /></button><div className="breadcrumbs"><span>ศูนย์ปฏิบัติการ</span><b>/</b><strong>{companyNav.find((item) => item.id === view)?.label}</strong></div><div className="topbar-actions"><div className="live-indicator"><i />ข้อมูลอัปเดตสด</div><PortalSwitcher portal="company" onChange={onSwitchPortal} /><button className="icon-button" aria-label="ค้นหา" onClick={() => notify('ค้นหาได้จากหน้า Booking Monitor')}><Search size={17} /></button><button className="icon-button has-notification" aria-label="การแจ้งเตือน" onClick={() => notify('มี 2 รายการที่ต้องติดตาม')}><Bell size={17} /></button></div></header>
         <div className="content-area">
-          {view === 'overview' && <CompanyOverview bookings={bookings} onSelectBooking={onSelectBooking} onNavigate={onNavigate} notify={notify} />}
-          {view === 'bookings' && <BookingMonitor bookings={bookings} onSelectBooking={onSelectBooking} onNavigate={onNavigate} />}
+          {view === 'overview' && <CompanyOverview bookings={bookings} onSelectBooking={onSelectBooking} onNavigate={onNavigate} onConfirmBooking={onConfirmBooking} notify={notify} />}
+          {view === 'bookings' && <BookingMonitor bookings={bookings} onSelectBooking={onSelectBooking} onNavigate={onNavigate} onConfirmBooking={onConfirmBooking} />}
           {view === 'calendar' && <OperationsCalendar bookings={bookings} vehicles={vehicles} onSelectBooking={onSelectBooking} onUpdateBooking={onUpdateBooking} notify={notify} />}
           {view === 'fleet' && <FleetView bookings={bookings} vehicles={vehicles} notify={notify} />}
           {view === 'customers' && <CustomersView bookings={bookings} onSelectBooking={onSelectBooking} />}
@@ -247,7 +269,7 @@ function PortalSwitcher({ portal, onChange }: { portal: Portal; onChange: (porta
   return <label className="portal-switcher"><span>มุมมอง</span><select value={portal} onChange={(event) => onChange(event.target.value as Portal)} aria-label="เลือกมุมมอง"><option value="company">ฝั่งบริษัท</option><option value="customer">ฝั่งผู้จอง</option></select><ChevronDown size={13} /></label>;
 }
 
-function CompanyOverview({ bookings, onSelectBooking, onNavigate, notify }: { bookings: Booking[]; onSelectBooking: (booking: Booking) => void; onNavigate: (view: CompanyView) => void; notify: (message: string) => void }) {
+function CompanyOverview({ bookings, onSelectBooking, onNavigate, onConfirmBooking, notify }: { bookings: Booking[]; onSelectBooking: (booking: Booking) => void; onNavigate: (view: CompanyView) => void; onConfirmBooking: (booking: Booking) => boolean | Promise<boolean>; notify: (message: string) => void }) {
   const today = bookings.filter((item) => item.date === '2026-08-29');
   const unassigned = bookings.filter((item) => item.vehicle === 'ยังไม่จัดรถ');
   const atRisk = bookings.filter((item) => item.sla !== 'ปกติ');
@@ -256,7 +278,7 @@ function CompanyOverview({ bookings, onSelectBooking, onNavigate, notify }: { bo
     <div className="toolbar"><div className="toolbar-search"><Search size={16} /><input placeholder="ค้นหาเลข Booking, ลูกค้า หรือสถานที่" /></div><button className="filter-button" onClick={() => notify('ตัวกรองพร้อมใช้งานในหน้า Booking Monitor')}><Filter size={15} /> ตัวกรอง</button><button className="date-button"><CalendarDays size={15} /> 29 ส.ค. 2569 <ChevronDown size={14} /></button></div>
     <div className="metric-strip"><Metric label="งานวันนี้" value={String(today.length).padStart(2, '0')} note="Booking ทั้งหมด" tone="teal" icon={<CalendarDays size={17} />} /><Metric label="กำลังดำเนินการ" value="08" note="จาก 24 งาน" tone="amber" icon={<Clock3 size={17} />} /><Metric label="ยังไม่จัดรถ" value={String(unassigned.length).padStart(2, '0')} note="ต้องจัดคิว" tone="blue" icon={<Truck size={17} />} /><Metric label="ต้องติดตาม" value={String(atRisk.length).padStart(2, '0')} note="SLA / conflict" tone="rose" icon={<AlertTriangle size={17} />} /></div>
     <div className="section-heading"><div><h2>งานวันนี้</h2><p>คลิก Booking เพื่อดูรายละเอียดและ timeline</p></div><button className="quiet-button" onClick={() => onNavigate('bookings')}>ดูทั้งหมด <ArrowRight size={15} /></button></div>
-    <div className="split-layout"><section className="panel table-panel"><div className="panel-head"><div className="head-title"><span className="live-dot" /> Live operations</div><button className="icon-button small" onClick={() => notify('ตั้งค่าการแสดงผลในเวอร์ชันถัดไป')}><MoreHorizontal size={16} /></button></div><BookingTable bookings={today} onSelectBooking={onSelectBooking} compact /></section><aside className="side-stack"><AttentionPanel bookings={atRisk} onSelectBooking={onSelectBooking} /><CapacityPanel bookings={bookings} /></aside></div>
+    <div className="split-layout"><section className="panel table-panel"><div className="panel-head"><div className="head-title"><span className="live-dot" /> Live operations</div><button className="icon-button small" onClick={() => notify('ตั้งค่าการแสดงผลในเวอร์ชันถัดไป')}><MoreHorizontal size={16} /></button></div><BookingBoard bookings={today} onSelectBooking={onSelectBooking} onConfirmBooking={onConfirmBooking} compact /></section><aside className="side-stack"><AttentionPanel bookings={atRisk} onSelectBooking={onSelectBooking} /><CapacityPanel bookings={bookings} /></aside></div>
     <section className="panel activity-panel"><div className="panel-head"><div><h3>กิจกรรมล่าสุด</h3><p>ความเคลื่อนไหวจากทีมและระบบ</p></div><button className="quiet-button" onClick={() => notify('เปิดประวัติกิจกรรมทั้งหมด')}>ดูทั้งหมด <ArrowRight size={15} /></button></div><div className="activity-grid"><Activity name="สมชาย ใจดี" text="เปลี่ยนสถานะเป็น กำลังให้บริการ" time="4 นาทีที่แล้ว" tone="teal" /><Activity name="วิชัย พรหมรักษา" text="เริ่มเดินทางไป มาบตาพุด, ระยอง" time="18 นาทีที่แล้ว" tone="amber" /><Activity name="ระบบ" text="มีคำขอจองใหม่จาก นอร์ทสตาร์ ฟู้ดส์" time="32 นาทีที่แล้ว" tone="violet" /></div></section>
   </>;
 }
@@ -269,7 +291,7 @@ function Metric({ label, value, note, tone, icon }: { label: string; value: stri
   return <div className="metric"><div className={`metric-icon ${tone}`}>{icon}</div><div><span>{label}</span><strong>{value}</strong><small>{note}</small></div></div>;
 }
 
-function BookingMonitor({ bookings, onSelectBooking, onNavigate }: { bookings: Booking[]; onSelectBooking: (booking: Booking) => void; onNavigate: (view: CompanyView) => void }) {
+function BookingMonitor({ bookings, onSelectBooking, onNavigate, onConfirmBooking }: { bookings: Booking[]; onSelectBooking: (booking: Booking) => void; onNavigate: (view: CompanyView) => void; onConfirmBooking: (booking: Booking) => boolean | Promise<boolean> }) {
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('ทั้งหมด');
   const filtered = useMemo(() => bookings.filter((item) => {
@@ -278,12 +300,47 @@ function BookingMonitor({ bookings, onSelectBooking, onNavigate }: { bookings: B
   }), [bookings, query, status]);
   return <>
     <PageHeader eyebrow="Company Operations Center · Booking Monitor" title="การจองทั้งหมด" copy="ค้นหา ตรวจสอบ และจัดการทุก Booking ของ Foresee" action={<button className="primary-button" onClick={() => onNavigate('calendar')}><CalendarDays size={17} /> เปิดปฏิทินจัดคิว</button>} />
-    <div className="panel monitor-panel"><div className="monitor-toolbar"><div className="toolbar-search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="ค้นหาเลข Booking, ลูกค้า หรือสถานที่" /></div><select className="select-control" value={status} onChange={(event) => setStatus(event.target.value)}><option>ทั้งหมด</option><option>รอยืนยัน</option><option>ยืนยันแล้ว</option><option>กำลังดำเนินการ</option><option>เสร็จสิ้น</option></select><button className="filter-button"><ListFilter size={15} /> ตัวกรองเพิ่มเติม</button><button className="icon-button small"><MoreHorizontal size={16} /></button></div><div className="table-meta"><span>แสดง {filtered.length} จาก {bookings.length} รายการ</span><span>อัปเดตสด <i className="live-dot" /></span></div><BookingTable bookings={filtered} onSelectBooking={onSelectBooking} /></div>
+    <div className="panel monitor-panel"><div className="monitor-toolbar"><div className="toolbar-search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="ค้นหาเลข Booking, ลูกค้า หรือสถานที่" /></div><select className="select-control" value={status} onChange={(event) => setStatus(event.target.value)}><option>ทั้งหมด</option><option>รอยืนยัน</option><option>ยืนยันแล้ว</option><option>กำลังดำเนินการ</option><option>เสร็จสิ้น</option></select><button className="filter-button"><ListFilter size={15} /> ตัวกรองเพิ่มเติม</button><button className="icon-button small"><MoreHorizontal size={16} /></button></div><div className="table-meta"><span>แสดง {filtered.length} จาก {bookings.length} รายการ</span><span>อัปเดตสด <i className="live-dot" /></span></div><BookingBoard bookings={filtered} onSelectBooking={onSelectBooking} onConfirmBooking={onConfirmBooking} /></div>
   </>;
 }
 
-function BookingTable({ bookings, onSelectBooking, compact = false }: { bookings: Booking[]; onSelectBooking: (booking: Booking) => void; compact?: boolean }) {
-  return <div className={compact ? 'data-table compact' : 'data-table'}><div className="table-row table-header"><span>Booking / ลูกค้า</span><span>บริการและสถานที่</span><span>วันเวลา</span><span>สถานะ</span><span>SLA</span><span /></div>{bookings.map((booking) => <button className="table-row table-data" key={booking.id} onClick={() => onSelectBooking(booking)}><span><b>{booking.id}</b><small>{booking.customer}</small></span><span><b>{booking.service}</b><small><MapPin size={12} /> {booking.site}</small></span><span><b>{formatThaiDate(booking.date)}</b><small><Clock3 size={12} /> {booking.start}–{booking.end}</small></span><span><em className={`status-chip ${statusClass[booking.status]}`}>{booking.status}</em><small className={`stage-label ${stageClass[booking.stage]}`}>{booking.stage}</small></span><span><em className={booking.sla === 'ปกติ' ? 'sla-ok' : 'sla-alert'}>{booking.sla}</em></span><ArrowRight className="row-arrow" size={16} /></button>)}{bookings.length === 0 && <div className="empty-table">ไม่พบ Booking ที่ตรงกับตัวกรอง</div>}</div>;
+const bookingColumns: Array<{ status: BookingStatus; title: string; description: string; tone: string }> = [
+  { status: 'รอยืนยัน', title: 'รอยืนยันข้อมูล', description: 'โทรเช็กข้อมูลกับลูกค้าก่อนยืนยันคิว', tone: 'pending' },
+  { status: 'ยืนยันแล้ว', title: 'ยืนยันแล้ว', description: 'วันเวลาและรายละเอียดผ่านการยืนยัน', tone: 'confirmed' },
+  { status: 'กำลังดำเนินการ', title: 'กำลังดำเนินการ', description: 'ทีมภาคสนามกำลังทำงานตามคิว', tone: 'progress' },
+  { status: 'เสร็จสิ้น', title: 'เสร็จสิ้น', description: 'งานปิดและพร้อมดูประวัติย้อนหลัง', tone: 'complete' },
+];
+
+function BookingBoard({ bookings, onSelectBooking, onConfirmBooking, compact = false }: { bookings: Booking[]; onSelectBooking: (booking: Booking) => void; onConfirmBooking: (booking: Booking) => boolean | Promise<boolean>; compact?: boolean }) {
+  const [confirming, setConfirming] = useState<Booking | null>(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
+  const commitConfirmation = async () => {
+    if (!confirming) return;
+    setConfirmBusy(true);
+    try {
+      if (await onConfirmBooking(confirming)) setConfirming(null);
+    } finally {
+      setConfirmBusy(false);
+    }
+  };
+  return <>
+    <div className={compact ? 'booking-board compact' : 'booking-board'}>
+      {bookingColumns.map((column) => {
+        const columnBookings = bookings.filter((booking) => booking.status === column.status);
+        return <section className={`booking-board-column ${column.tone}`} key={column.status}>
+          <header className="booking-board-column-header"><div className="booking-board-column-title"><i /><div><b>{column.title}</b><small>{column.description}</small></div></div><em>{columnBookings.length}</em></header>
+          <div className="booking-board-list">
+            {columnBookings.map((booking) => <article className="booking-board-card" key={booking.id}>
+              <button className="board-card-main" onClick={() => onSelectBooking(booking)}><span className="board-card-id">{booking.id}</span><b>{booking.customer}</b><small>{booking.service}</small><span className="board-card-meta"><span><CalendarDays size={12} /> {formatThaiDate(booking.date)}</span><span><Clock3 size={12} /> {booking.start}–{booking.end}</span></span></button>
+              <div className="board-card-footer"><span>{booking.vehicle === 'ยังไม่จัดรถ' ? 'รอจัดรถ' : booking.vehicle}</span>{column.status === 'รอยืนยัน' ? <><button className="board-card-link" onClick={() => onSelectBooking(booking)}>โทรยืนยัน</button><button className="board-confirm-button" onClick={() => setConfirming(booking)}>ยืนยันแล้ว</button></> : <button className="board-card-link" onClick={() => onSelectBooking(booking)}>ดูรายละเอียด <ArrowRight size={13} /></button>}</div>
+            </article>)}
+            {columnBookings.length === 0 && <div className="booking-board-empty">ยังไม่มีรายการ</div>}
+          </div>
+        </section>;
+      })}
+    </div>
+    {confirming && <FeedbackModal variant="confirm" title="ยืนยันข้อมูลกับลูกค้าแล้วหรือยัง?" copy={`หลังโทรเช็ก ${confirming.customer} แล้ว ย้าย ${confirming.id} ไปสถานะ “ยืนยันแล้ว”`} confirmLabel="ย้ายเป็นยืนยันแล้ว" onConfirm={commitConfirmation} onClose={() => { if (!confirmBusy) setConfirming(null); }} busy={confirmBusy} />}
+  </>;
 }
 
 function AttentionPanel({ bookings, onSelectBooking }: { bookings: Booking[]; onSelectBooking: (booking: Booking) => void }) {

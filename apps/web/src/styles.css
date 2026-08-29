@@ -499,7 +499,8 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
 @media (max-width: 600px) { .feedback-modal { padding: 31px 20px 22px; border-radius: 17px; }.feedback-modal h2 { font-size: 21px; }.feedback-modal p { font-size: 11px; }.feedback-modal-actions { grid-template-columns: 1fr; }.feedback-modal-actions .primary-button { order: -1; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
 
-/* Keep the operations navigation visible while the workspace content scrolls. */
+/* Keep the operations navigation and top tab bar visible while the workspace content scrolls. */
+.app-frame > .main-pane > .topbar { position: sticky; z-index: 20; top: 0; box-shadow: 0 2px 12px #173c370d; backdrop-filter: blur(12px); }
 @media (min-width: 761px) {
   .app-frame { align-items: flex-start; }
   .app-frame > .sidebar { position: sticky; top: 0; height: 100vh; max-height: 100vh; align-self: flex-start; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #4f7f75 transparent; }
@@ -540,6 +541,43 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
   .customer-row { grid-template-columns: 44px minmax(0, 1fr) 28px; gap: 14px; min-height: 82px; padding: 14px 0; }
   .customer-row b { font-size: 14px; }
   .customer-row small { margin-top: 5px; font-size: 11px; }
+}
+
+/* Booking workflow board: every state is visible at once for quick triage. */
+.booking-board { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; padding: 0 18px 18px; overflow-x: auto; align-items: start; overscroll-behavior-x: contain; }
+.booking-board.compact { grid-template-columns: repeat(4, minmax(190px, 1fr)); padding-right: 18px; padding-left: 18px; }
+.booking-board-column { min-width: 0; overflow: hidden; border: 1px solid #e2ebe7; border-radius: 11px; background: #f8fbf9; }
+.booking-board-column.pending { border-color: #f0e2c1; background: #fffaf1; }
+.booking-board-column.confirmed { border-color: #d7e6f0; background: #f7fbfd; }
+.booking-board-column.progress { border-color: #cfe9df; background: #f4fbf8; }
+.booking-board-column.complete { border-color: #d8eadc; background: #f7fcf8; }
+.booking-board-column-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 9px; padding: 13px 13px 11px; border-bottom: 1px solid #e4ece8; }
+.booking-board-column.pending .booking-board-column-header { border-bottom-color: #f1e6ce; }.booking-board-column.confirmed .booking-board-column-header { border-bottom-color: #dceaf2; }.booking-board-column.progress .booking-board-column-header { border-bottom-color: #d9eee6; }.booking-board-column.complete .booking-board-column-header { border-bottom-color: #deeee1; }
+.booking-board-column-title { display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
+.booking-board-column-title > i { width: 8px; height: 8px; flex: 0 0 auto; margin-top: 4px; border-radius: 50%; background: #dca94e; box-shadow: 0 0 0 3px #f5e8c5; }
+.booking-board-column.confirmed .booking-board-column-title > i { background: #6b9fc7; box-shadow: 0 0 0 3px #dfedf6; }.booking-board-column.progress .booking-board-column-title > i { background: #4cae95; box-shadow: 0 0 0 3px #d9f1e8; }.booking-board-column.complete .booking-board-column-title > i { background: #65ad78; box-shadow: 0 0 0 3px #def0e2; }
+.booking-board-column-title b, .booking-board-column-title small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.booking-board-column-title b { color: #4f6d64; font-size: 11px; font-weight: 700; }.booking-board-column-title small { margin-top: 3px; color: #94a59f; font-size: 8px; }
+.booking-board-column-header > em { min-width: 24px; padding: 4px 6px; border-radius: 9px; color: #936d27; background: #f8eac9; font-size: 9px; font-style: normal; font-weight: 700; text-align: center; }.booking-board-column.confirmed .booking-board-column-header > em { color: #477797; background: #e1eff8; }.booking-board-column.progress .booking-board-column-header > em { color: #2f806d; background: #dff3eb; }.booking-board-column.complete .booking-board-column-header > em { color: #4a8a5c; background: #e1f2e4; }
+.booking-board-list { display: grid; gap: 8px; min-height: 150px; padding: 10px; }
+.booking-board-card { overflow: hidden; border: 1px solid #e0e9e5; border-radius: 9px; background: #fff; box-shadow: 0 3px 10px #173c3708; }
+.booking-board-card:hover { border-color: #b9dace; box-shadow: 0 7px 16px #173c3712; }
+.board-card-main { display: block; width: 100%; padding: 12px 12px 9px; border: 0; color: #57766d; background: transparent; text-align: left; }
+.board-card-main:hover { background: #fbfefd; }.board-card-main > b, .board-card-main > small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.board-card-id { display: block; color: #9baca7; font-size: 8px; letter-spacing: .03em; }.board-card-main > b { margin-top: 5px; color: #49695f; font-size: 11px; font-weight: 700; }.board-card-main > small { margin-top: 3px; color: #91a49d; font-size: 9px; }
+.board-card-meta { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 9px; color: #7e968e; font-size: 8px; }.board-card-meta > span { display: inline-flex; align-items: center; gap: 4px; }.board-card-meta svg { color: #70a695; }
+.board-card-footer { display: flex; align-items: center; gap: 6px; min-height: 35px; padding: 0 10px; border-top: 1px solid #edf2f0; }.board-card-footer > span { min-width: 0; overflow: hidden; flex: 1; color: #94a69f; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }.board-card-link, .board-confirm-button { min-height: 25px; padding: 0 6px; border: 0; border-radius: 5px; color: #4f8a7d; background: transparent; font-size: 8px; font-weight: 600; white-space: nowrap; }.board-card-link { display: inline-flex; align-items: center; gap: 3px; }.board-card-link:hover { background: #eff8f4; }.board-confirm-button { color: #fff; background: #0b7f6d; }.board-confirm-button:hover { background: #086a5b; }
+.booking-board-empty { display: grid; min-height: 92px; place-items: center; border: 1px dashed #dce8e3; border-radius: 8px; color: #a0b1ab; background: #fff; font-size: 9px; }
+@media (min-width: 761px) {
+  .booking-board { gap: 15px; padding: 0 24px 24px; }
+  .booking-board.compact { gap: 10px; padding-right: 18px; padding-left: 18px; }
+  .booking-board-column-header { padding: 16px 15px 13px; }.booking-board-column-title b { font-size: 13px; }.booking-board-column-title small { font-size: 9px; }.booking-board-column-header > em { min-width: 28px; font-size: 10px; }.booking-board-list { gap: 10px; padding: 12px; }.board-card-main { padding: 14px 13px 11px; }.board-card-id { font-size: 9px; }.board-card-main > b { font-size: 13px; }.board-card-main > small { font-size: 10px; }.board-card-meta { font-size: 9px; }.board-card-footer { min-height: 40px; padding: 0 11px; }.board-card-footer > span { font-size: 9px; }.board-card-link, .board-confirm-button { min-height: 28px; font-size: 9px; }.booking-board-empty { font-size: 10px; }
+}
+@media (max-width: 760px) {
+  .booking-board { grid-template-columns: repeat(4, minmax(235px, 1fr)); gap: 10px; padding: 0 12px 14px; }
+  .booking-board.compact { grid-template-columns: repeat(4, minmax(220px, 1fr)); padding-right: 12px; padding-left: 12px; }
+}
+@media (min-width: 761px) and (max-width: 1120px) {
+  .booking-board:not(.compact) { grid-template-columns: repeat(4, minmax(185px, 1fr)); }
 }
 @media (max-width: 760px) {
   .company-calendar-weekdays span { padding: 9px 2px; font-size: 9px; }
