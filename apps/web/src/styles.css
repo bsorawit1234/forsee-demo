@@ -498,3 +498,11 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
 .feedback-modal-actions { display: grid; grid-template-columns: 1fr 1.35fr; gap: 9px; margin-top: 25px; }.feedback-modal-actions button, .feedback-modal-success-button { min-height: 45px; width: 100%; border-radius: 10px; }.feedback-modal-success-button { margin-top: 24px; }
 @media (max-width: 600px) { .feedback-modal { padding: 31px 20px 22px; border-radius: 17px; }.feedback-modal h2 { font-size: 21px; }.feedback-modal p { font-size: 11px; }.feedback-modal-actions { grid-template-columns: 1fr; }.feedback-modal-actions .primary-button { order: -1; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
+
+/* Keep the operations navigation visible while the workspace content scrolls. */
+@media (min-width: 761px) {
+  .app-frame { align-items: flex-start; }
+  .app-frame > .sidebar { position: sticky; top: 0; height: 100vh; max-height: 100vh; align-self: flex-start; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #4f7f75 transparent; }
+  .app-frame > .sidebar::-webkit-scrollbar { width: 6px; }
+  .app-frame > .sidebar::-webkit-scrollbar-thumb { border-radius: 6px; background: #4f7f75; }
+}
