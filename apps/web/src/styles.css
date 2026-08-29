@@ -526,6 +526,21 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
 .company-month-cell::after { position: absolute; top: 17px; right: 15px; width: 7px; height: 7px; border-radius: 50%; background: #6bc3aa; content: ''; }
 .company-month-cell.selected::after { background: #0b7f6d; box-shadow: 0 0 0 3px #c6ebdf; }
 .company-month-cell.outside::after { display: none; }
+.customer-list { display: grid; gap: 0; padding: 0 18px 8px; }
+.customer-row { width: 100%; display: grid; grid-template-columns: 36px minmax(0, 1fr) 24px; align-items: center; gap: 11px; min-height: 68px; padding: 11px 0; border: 0; border-bottom: 1px solid #edf2f0; color: #5f7a72; background: #fff; text-align: left; }
+.customer-row:last-child { border-bottom: 0; }
+.customer-row:hover { background: #f7fbfa; }
+.customer-row > div:nth-child(2) { min-width: 0; }
+.customer-row b, .customer-row small { display: block; }
+.customer-row b { overflow: hidden; color: #47665e; font-size: 11px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.customer-row small { margin-top: 4px; overflow: hidden; color: #9aaca6; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.customer-row > svg { justify-self: end; color: #9eb2aa; }
+@media (min-width: 761px) {
+  .customer-list { padding: 0 24px 12px; }
+  .customer-row { grid-template-columns: 44px minmax(0, 1fr) 28px; gap: 14px; min-height: 82px; padding: 14px 0; }
+  .customer-row b { font-size: 14px; }
+  .customer-row small { margin-top: 5px; font-size: 11px; }
+}
 @media (max-width: 760px) {
   .company-calendar-weekdays span { padding: 9px 2px; font-size: 9px; }
   .company-month-cell { min-height: 92px; gap: 5px; padding: 9px 6px; }
