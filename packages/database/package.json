@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "generate": "prisma generate",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
     "migrate:dev": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
     "seed:apply": "tsx seeds/seed-runner.ts"

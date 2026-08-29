@@ -9,7 +9,8 @@
     "preview": "vite preview --host 0.0.0.0",
     "lint": "eslint src --ext .ts,.tsx",
     "typecheck": "tsc -b",
-    "test": "vitest run"
+    "test": "vitest run --config vitest.config.ts",
+    "test:unit": "vitest run --config vitest.config.ts"
   },
   "dependencies": {
     "@forsee/api-client": "workspace:*",

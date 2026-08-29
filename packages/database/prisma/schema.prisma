@@ -59,45 +59,45 @@ enum VehicleStatus {
 }
 
 model User {
-  id                 String                 @id @default(uuid()) @db.Uuid
-  email              String                 @unique
-  passwordHash       String                 @map("password_hash")
-  displayName        String                 @map("display_name")
-  phone              String?
-  status             UserStatus             @default(INVITED)
-  emailVerifiedAt    DateTime?              @map("email_verified_at")
-  lastLoginAt        DateTime?              @map("last_login_at")
-  memberships        OrganizationMembership[]
-  createdAt          DateTime               @default(now()) @map("created_at")
-  updatedAt          DateTime               @updatedAt @map("updated_at")
+  id              String                   @id @default(uuid()) @db.Uuid
+  email           String                   @unique
+  passwordHash    String                   @map("password_hash")
+  displayName     String                   @map("display_name")
+  phone           String?
+  status          UserStatus               @default(INVITED)
+  emailVerifiedAt DateTime?                @map("email_verified_at")
+  lastLoginAt     DateTime?                @map("last_login_at")
+  memberships     OrganizationMembership[]
+  createdAt       DateTime                 @default(now()) @map("created_at")
+  updatedAt       DateTime                 @updatedAt @map("updated_at")
 
   @@map("users")
 }
 
 model Organization {
-  id           String                   @id @default(uuid()) @db.Uuid
-  type         OrganizationType
-  name         String
-  taxId        String?                  @map("tax_id")
-  status       String                   @default("ACTIVE")
-  memberships  OrganizationMembership[]
+  id            String                   @id @default(uuid()) @db.Uuid
+  type          OrganizationType
+  name          String
+  taxId         String?                  @map("tax_id")
+  status        String                   @default("ACTIVE")
+  memberships   OrganizationMembership[]
   customerSites CustomerSite[]
-  bookings     Booking[]
-  createdAt    DateTime                 @default(now()) @map("created_at")
-  updatedAt    DateTime                 @updatedAt @map("updated_at")
+  bookings      Booking[]
+  createdAt     DateTime                 @default(now()) @map("created_at")
+  updatedAt     DateTime                 @updatedAt @map("updated_at")
 
   @@map("organizations")
 }
 
 model OrganizationMembership {
-  id             String       @id @default(uuid()) @db.Uuid
-  organizationId String       @map("organization_id") @db.Uuid
-  userId         String       @map("user_id") @db.Uuid
+  id             String         @id @default(uuid()) @db.Uuid
+  organizationId String         @map("organization_id") @db.Uuid
+  userId         String         @map("user_id") @db.Uuid
   role           MembershipRole
-  status         String       @default("ACTIVE")
-  organization   Organization @relation(fields: [organizationId], references: [id])
-  user           User         @relation(fields: [userId], references: [id])
-  createdAt      DateTime     @default(now()) @map("created_at")
+  status         String         @default("ACTIVE")
+  organization   Organization   @relation(fields: [organizationId], references: [id])
+  user           User           @relation(fields: [userId], references: [id])
+  createdAt      DateTime       @default(now()) @map("created_at")
 
   @@unique([organizationId, userId])
   @@index([userId])
@@ -105,70 +105,94 @@ model OrganizationMembership {
 }
 
 model CustomerSite {
-  id                       String       @id @default(uuid()) @db.Uuid
-  customerOrganizationId   String       @map("customer_organization_id") @db.Uuid
-  name                     String
-  addressLine              String       @map("address_line")
-  district                 String?
-  province                 String?
-  postalCode               String?      @map("postal_code")
-  zoneCode                 String?      @map("zone_code")
-  contactName              String?      @map("contact_name")
-  contactPhone             String?      @map("contact_phone")
-  accessInstructions       String?      @map("access_instructions")
-  isActive                 Boolean      @default(true) @map("is_active")
-  organization             Organization @relation(fields: [customerOrganizationId], references: [id])
-  bookings                 Booking[]
-  createdAt                DateTime     @default(now()) @map("created_at")
-  updatedAt                DateTime     @updatedAt @map("updated_at")
+  id                     String       @id @default(uuid()) @db.Uuid
+  customerOrganizationId String       @map("customer_organization_id") @db.Uuid
+  name                   String
+  addressLine            String       @map("address_line")
+  district               String?
+  province               String?
+  postalCode             String?      @map("postal_code")
+  zoneCode               String?      @map("zone_code")
+  contactName            String?      @map("contact_name")
+  contactPhone           String?      @map("contact_phone")
+  accessInstructions     String?      @map("access_instructions")
+  isActive               Boolean      @default(true) @map("is_active")
+  organization           Organization @relation(fields: [customerOrganizationId], references: [id])
+  bookings               Booking[]
+  createdAt              DateTime     @default(now()) @map("created_at")
+  updatedAt              DateTime     @updatedAt @map("updated_at")
 
   @@index([customerOrganizationId, isActive])
   @@map("customer_sites")
 }
 
 model VehicleType {
-  id             String        @id @default(uuid()) @db.Uuid
-  code           String        @unique
-  nameTh         String        @map("name_th")
-  capacityUnit   String        @map("capacity_unit")
-  defaultCapacity Decimal?     @map("default_capacity") @db.Decimal(10, 2)
-  isActive       Boolean       @default(true) @map("is_active")
-  vehicles       Vehicle[]
-  serviceTypes   ServiceType[]
+  id              String         @id @default(uuid()) @db.Uuid
+  code            String         @unique
+  nameTh          String         @map("name_th")
+  capacityUnit    String         @map("capacity_unit")
+  defaultCapacity Decimal?       @map("default_capacity") @db.Decimal(10, 2)
+  isActive        Boolean        @default(true) @map("is_active")
+  vehicles        Vehicle[]
+  serviceTypes    ServiceType[]
+  capacityRules   CapacityRule[]
 
   @@map("vehicle_types")
 }
 
 model ServiceType {
-  id                     String      @id @default(uuid()) @db.Uuid
-  code                   String      @unique
-  nameTh                 String      @map("name_th")
-  descriptionTh          String?     @map("description_th")
-  defaultDurationMinutes Int         @map("default_duration_minutes")
-  requiredVehicleTypeId  String      @map("required_vehicle_type_id") @db.Uuid
-  minimumCapacity        Decimal?    @map("minimum_capacity") @db.Decimal(10, 2)
-  maximumCapacity        Decimal?    @map("maximum_capacity") @db.Decimal(10, 2)
-  isActive               Boolean     @default(true) @map("is_active")
-  requiredVehicleType    VehicleType @relation(fields: [requiredVehicleTypeId], references: [id])
+  id                     String         @id @default(uuid()) @db.Uuid
+  code                   String         @unique
+  nameTh                 String         @map("name_th")
+  descriptionTh          String?        @map("description_th")
+  defaultDurationMinutes Int            @map("default_duration_minutes")
+  requiredVehicleTypeId  String         @map("required_vehicle_type_id") @db.Uuid
+  minimumCapacity        Decimal?       @map("minimum_capacity") @db.Decimal(10, 2)
+  maximumCapacity        Decimal?       @map("maximum_capacity") @db.Decimal(10, 2)
+  isActive               Boolean        @default(true) @map("is_active")
+  requiredVehicleType    VehicleType    @relation(fields: [requiredVehicleTypeId], references: [id])
   bookings               Booking[]
+  capacityRules          CapacityRule[]
 
   @@index([requiredVehicleTypeId, isActive])
   @@map("service_types")
 }
 
+model CapacityRule {
+  id            String       @id @default(uuid()) @db.Uuid
+  code          String       @unique
+  nameTh        String       @map("name_th")
+  serviceTypeId String?      @map("service_type_id") @db.Uuid
+  vehicleTypeId String?      @map("vehicle_type_id") @db.Uuid
+  dayOfWeek     Int?         @map("day_of_week")
+  startTime     String?      @map("start_time")
+  endTime       String?      @map("end_time")
+  maxConcurrent Int          @map("max_concurrent")
+  effectiveFrom DateTime?    @map("effective_from")
+  effectiveTo   DateTime?    @map("effective_to")
+  isActive      Boolean      @default(true) @map("is_active")
+  serviceType   ServiceType? @relation(fields: [serviceTypeId], references: [id])
+  vehicleType   VehicleType? @relation(fields: [vehicleTypeId], references: [id])
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+
+  @@index([serviceTypeId, vehicleTypeId, dayOfWeek, isActive])
+  @@map("capacity_rules")
+}
+
 model Vehicle {
-  id                  String          @id @default(uuid()) @db.Uuid
-  registrationNumber  String          @unique @map("registration_number")
-  displayName         String          @map("display_name")
-  vehicleTypeId       String          @map("vehicle_type_id") @db.Uuid
-  capacity            Decimal?        @db.Decimal(10, 2)
-  status              VehicleStatus    @default(AVAILABLE)
-  isActive            Boolean         @default(true) @map("is_active")
-  vehicleType         VehicleType     @relation(fields: [vehicleTypeId], references: [id])
-  assignments         BookingAssignment[]
-  maintenance         VehicleMaintenance[]
-  createdAt            DateTime        @default(now()) @map("created_at")
-  updatedAt            DateTime        @updatedAt @map("updated_at")
+  id                 String               @id @default(uuid()) @db.Uuid
+  registrationNumber String               @unique @map("registration_number")
+  displayName        String               @map("display_name")
+  vehicleTypeId      String               @map("vehicle_type_id") @db.Uuid
+  capacity           Decimal?             @db.Decimal(10, 2)
+  status             VehicleStatus        @default(AVAILABLE)
+  isActive           Boolean              @default(true) @map("is_active")
+  vehicleType        VehicleType          @relation(fields: [vehicleTypeId], references: [id])
+  assignments        BookingAssignment[]
+  maintenance        VehicleMaintenance[]
+  createdAt          DateTime             @default(now()) @map("created_at")
+  updatedAt          DateTime             @updatedAt @map("updated_at")
 
   @@index([vehicleTypeId, status])
   @@map("vehicles")
@@ -189,38 +213,38 @@ model VehicleMaintenance {
 }
 
 model Booking {
-  id                     String             @id @default(uuid()) @db.Uuid
-  bookingNumber          String             @unique @map("booking_number")
-  customerOrganizationId String             @map("customer_organization_id") @db.Uuid
-  customerSiteId         String             @map("customer_site_id") @db.Uuid
-  serviceTypeId          String             @map("service_type_id") @db.Uuid
-  requestedStartAt       DateTime           @map("requested_start_at")
-  requestedEndAt         DateTime           @map("requested_end_at")
-  confirmedStartAt       DateTime?          @map("confirmed_start_at")
-  confirmedEndAt         DateTime?          @map("confirmed_end_at")
-  estimatedVolume        Decimal?           @map("estimated_volume") @db.Decimal(10, 2)
-  volumeUnit             String?            @map("volume_unit")
-  bookingStatus          BookingStatus      @default(PENDING_CONFIRMATION) @map("booking_status")
-  assignmentStatus       AssignmentStatus   @default(UNASSIGNED) @map("assignment_status")
-  jobStage               JobStage           @default(SCHEDULED) @map("job_stage")
-  slaHealth              SlaHealth           @default(ON_TRACK) @map("sla_health")
-  priority               Int                 @default(0)
-  customerNote           String?             @map("customer_note")
-  internalNote           String?             @map("internal_note")
-  version                Int                 @default(1)
-  createdByUserId        String              @map("created_by_user_id") @db.Uuid
-  confirmedByUserId      String?             @map("confirmed_by_user_id") @db.Uuid
-  cancelledByUserId      String?             @map("cancelled_by_user_id") @db.Uuid
-  cancelledReason        String?             @map("cancelled_reason")
-  customerOrganization   Organization        @relation(fields: [customerOrganizationId], references: [id])
-  customerSite           CustomerSite        @relation(fields: [customerSiteId], references: [id])
-  serviceType            ServiceType         @relation(fields: [serviceTypeId], references: [id])
+  id                     String                 @id @default(uuid()) @db.Uuid
+  bookingNumber          String                 @unique @map("booking_number")
+  customerOrganizationId String                 @map("customer_organization_id") @db.Uuid
+  customerSiteId         String                 @map("customer_site_id") @db.Uuid
+  serviceTypeId          String                 @map("service_type_id") @db.Uuid
+  requestedStartAt       DateTime               @map("requested_start_at")
+  requestedEndAt         DateTime               @map("requested_end_at")
+  confirmedStartAt       DateTime?              @map("confirmed_start_at")
+  confirmedEndAt         DateTime?              @map("confirmed_end_at")
+  estimatedVolume        Decimal?               @map("estimated_volume") @db.Decimal(10, 2)
+  volumeUnit             String?                @map("volume_unit")
+  bookingStatus          BookingStatus          @default(PENDING_CONFIRMATION) @map("booking_status")
+  assignmentStatus       AssignmentStatus       @default(UNASSIGNED) @map("assignment_status")
+  jobStage               JobStage               @default(SCHEDULED) @map("job_stage")
+  slaHealth              SlaHealth              @default(ON_TRACK) @map("sla_health")
+  priority               Int                    @default(0)
+  customerNote           String?                @map("customer_note")
+  internalNote           String?                @map("internal_note")
+  version                Int                    @default(1)
+  createdByUserId        String                 @map("created_by_user_id") @db.Uuid
+  confirmedByUserId      String?                @map("confirmed_by_user_id") @db.Uuid
+  cancelledByUserId      String?                @map("cancelled_by_user_id") @db.Uuid
+  cancelledReason        String?                @map("cancelled_reason")
+  customerOrganization   Organization           @relation(fields: [customerOrganizationId], references: [id])
+  customerSite           CustomerSite           @relation(fields: [customerSiteId], references: [id])
+  serviceType            ServiceType            @relation(fields: [serviceTypeId], references: [id])
   assignments            BookingAssignment[]
   statusHistory          BookingStatusHistory[]
   jobEvents              JobEvent[]
   attachments            Attachment[]
-  createdAt              DateTime            @default(now()) @map("created_at")
-  updatedAt              DateTime            @updatedAt @map("updated_at")
+  createdAt              DateTime               @default(now()) @map("created_at")
+  updatedAt              DateTime               @updatedAt @map("updated_at")
 
   @@index([customerOrganizationId, createdAt])
   @@index([requestedStartAt, requestedEndAt])
@@ -230,17 +254,17 @@ model Booking {
 }
 
 model BookingAssignment {
-  id                String   @id @default(uuid()) @db.Uuid
-  bookingId         String   @map("booking_id") @db.Uuid
-  vehicleId         String   @map("vehicle_id") @db.Uuid
-  driverUserId      String?  @map("driver_user_id") @db.Uuid
-  assignedByUserId  String   @map("assigned_by_user_id") @db.Uuid
-  assignedAt       DateTime @default(now()) @map("assigned_at")
+  id               String    @id @default(uuid()) @db.Uuid
+  bookingId        String    @map("booking_id") @db.Uuid
+  vehicleId        String    @map("vehicle_id") @db.Uuid
+  driverUserId     String?   @map("driver_user_id") @db.Uuid
+  assignedByUserId String    @map("assigned_by_user_id") @db.Uuid
+  assignedAt       DateTime  @default(now()) @map("assigned_at")
   unassignedAt     DateTime? @map("unassigned_at")
-  isCurrent        Boolean  @default(true) @map("is_current")
+  isCurrent        Boolean   @default(true) @map("is_current")
   reason           String?
-  booking          Booking  @relation(fields: [bookingId], references: [id])
-  vehicle          Vehicle  @relation(fields: [vehicleId], references: [id])
+  booking          Booking   @relation(fields: [bookingId], references: [id])
+  vehicle          Vehicle   @relation(fields: [vehicleId], references: [id])
 
   @@index([bookingId, isCurrent])
   @@index([vehicleId, assignedAt])
@@ -263,33 +287,33 @@ model BookingStatusHistory {
 }
 
 model JobEvent {
-  id          String   @id @default(uuid()) @db.Uuid
-  bookingId   String   @map("booking_id") @db.Uuid
-  eventType   String   @map("event_type")
-  actorUserId String   @map("actor_user_id") @db.Uuid
-  occurredAt  DateTime @default(now()) @map("occurred_at")
-  latitude    Decimal? @db.Decimal(9, 6)
-  longitude   Decimal? @db.Decimal(9, 6)
-  note        String?
+  id           String   @id @default(uuid()) @db.Uuid
+  bookingId    String   @map("booking_id") @db.Uuid
+  eventType    String   @map("event_type")
+  actorUserId  String   @map("actor_user_id") @db.Uuid
+  occurredAt   DateTime @default(now()) @map("occurred_at")
+  latitude     Decimal? @db.Decimal(9, 6)
+  longitude    Decimal? @db.Decimal(9, 6)
+  note         String?
   metadataJson Json?    @map("metadata_json")
-  booking     Booking  @relation(fields: [bookingId], references: [id])
+  booking      Booking  @relation(fields: [bookingId], references: [id])
 
   @@index([bookingId, occurredAt])
   @@map("job_events")
 }
 
 model Attachment {
-  id                String   @id @default(uuid()) @db.Uuid
-  bookingId         String   @map("booking_id") @db.Uuid
-  jobEventId        String?  @map("job_event_id") @db.Uuid
-  storageKey        String   @map("storage_key")
-  originalFilename  String   @map("original_filename")
-  contentType       String   @map("content_type")
-  sizeBytes         Int      @map("size_bytes")
-  checksum          String?
-  uploadedByUserId  String   @map("uploaded_by_user_id") @db.Uuid
-  createdAt         DateTime @default(now()) @map("created_at")
-  booking           Booking  @relation(fields: [bookingId], references: [id])
+  id               String   @id @default(uuid()) @db.Uuid
+  bookingId        String   @map("booking_id") @db.Uuid
+  jobEventId       String?  @map("job_event_id") @db.Uuid
+  storageKey       String   @map("storage_key")
+  originalFilename String   @map("original_filename")
+  contentType      String   @map("content_type")
+  sizeBytes        Int      @map("size_bytes")
+  checksum         String?
+  uploadedByUserId String   @map("uploaded_by_user_id") @db.Uuid
+  createdAt        DateTime @default(now()) @map("created_at")
+  booking          Booking  @relation(fields: [bookingId], references: [id])
 
   @@index([bookingId, createdAt])
   @@map("attachments")

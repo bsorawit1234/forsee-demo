@@ -24,5 +24,6 @@ COPY --from=build /workspace/apps/api/dist ./dist
 COPY --from=build /workspace/apps/api/package.json ./package.json
 COPY --from=build /workspace/node_modules ./node_modules
 COPY --from=build /workspace/packages/database/prisma ./prisma
+COPY --from=build /workspace/packages/database/seeds ./seeds
 EXPOSE 3000
 CMD ["node", "dist/main.js"]

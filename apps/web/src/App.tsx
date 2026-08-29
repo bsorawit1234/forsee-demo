@@ -1,4 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { fetchOperationsBookings, isApiEnabled, submitCustomerBooking, watchOperationEvents, type ApiBooking } from './lib/api';
+import { formatThaiDate } from './lib/format';
 import {
   AlertTriangle,
   ArrowLeft,
@@ -81,10 +83,16 @@ const stageClass: Record<JobStage, string> = {
   'เสร็จสิ้น': 'stage-complete',
 };
 
-const formatThaiDate = (date: string) => {
-  const value = new Date(`${date}T00:00:00`);
-  return new Intl.DateTimeFormat('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }).format(value);
-};
+function toUiBooking(item: ApiBooking): Booking {
+  const start = new Date(item.requestedStartAt);
+  const end = new Date(item.requestedEndAt);
+  const thaiDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok', year: 'numeric', month: '2-digit', day: '2-digit' }).format(start);
+  const clock = (value: Date) => new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit', hour12: false }).format(value);
+  const statuses: Record<string, BookingStatus> = { PENDING_CONFIRMATION: 'รอยืนยัน', CONFIRMED: 'ยืนยันแล้ว', REJECTED: 'รอยืนยัน', CANCELLED: 'เสร็จสิ้น' };
+  const stages: Record<string, JobStage> = { SCHEDULED: 'รอเริ่มงาน', EN_ROUTE: 'กำลังเดินทาง', ARRIVED: 'ถึงหน้างาน', IN_SERVICE: 'กำลังให้บริการ', COMPLETED: 'เสร็จสิ้น' };
+  const status = item.jobStage === 'IN_SERVICE' ? 'กำลังดำเนินการ' : item.jobStage === 'COMPLETED' ? 'เสร็จสิ้น' : statuses[item.bookingStatus] ?? 'ยืนยันแล้ว';
+  return { id: item.bookingNumber, customer: item.customer ?? 'ไม่ระบุลูกค้า', service: item.service ?? 'ไม่ระบุบริการ', site: item.site ?? 'ไม่ระบุสถานที่', date: thaiDate, start: clock(start), end: clock(end), vehicle: item.vehicle ?? 'ยังไม่จัดรถ', driver: item.vehicle ? 'ทีมภาคสนาม' : 'ยังไม่จัดทีม', status, stage: stages[item.jobStage] ?? 'รอเริ่มงาน', sla: item.slaHealth === 'OVERDUE' ? 'เกินกำหนด' : item.slaHealth === 'AT_RISK' ? 'ต้องติดตาม' : 'ปกติ' };
+}
 
 export default function App() {
   const [portal, setPortal] = useState<Portal>('company');
@@ -93,6 +101,15 @@ export default function App() {
   const [bookings, setBookings] = useState(seedBookings);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [toast, setToast] = useState('');
+
+  useEffect(() => {
+    if (!isApiEnabled()) return undefined;
+    let mounted = true;
+    const refresh = () => fetchOperationsBookings().then((result) => { if (mounted && result.items.length) setBookings(result.items.map(toUiBooking)); }).catch(() => undefined);
+    refresh();
+    const stop = watchOperationEvents(refresh);
+    return () => { mounted = false; stop(); };
+  }, []);
 
   const notify = (message: string) => {
     setToast(message);
@@ -303,7 +320,19 @@ function CustomerNewBooking({ notify, onNavigate }: { notify: (message: string) 
   const services = [{ name: 'ดูดบ่อดักไขมัน', detail: 'รถดูดสูญญากาศ', icon: '≋', tone: 'teal' }, { name: 'ขนส่งกากอุตสาหกรรม', detail: 'รถขนกากมาตรฐาน', icon: '▱', tone: 'amber' }, { name: 'ล้างบ่อบำบัดน้ำเสีย', detail: 'รถดูดตะกอน', icon: '✧', tone: 'violet' }];
   const days = [{ date: '2026-08-31', label: 'จ. 31', state: 'เหลือ 1 ช่วง', tone: 'limited' }, { date: '2026-09-01', label: 'อ. 1', state: 'ว่าง 3 ช่วง', tone: 'open' }, { date: '2026-09-02', label: 'พ. 2', state: 'ว่าง 2 ช่วง', tone: 'open' }, { date: '2026-09-03', label: 'พฤ. 3', state: 'เต็ม', tone: 'closed' }, { date: '2026-09-04', label: 'ศ. 4', state: 'ว่าง 3 ช่วง', tone: 'open' }];
   const slots = selectedDate === '2026-08-31' ? ['13:00–15:30'] : selectedDate === '2026-09-03' ? [] : ['09:00–11:30', '13:00–15:30', '15:30–18:00'];
-  const submit = () => { setSubmitted(true); notify('ส่งคำขอจองแล้ว ทีมงานจะยืนยันภายใน 15 นาที'); };
+  const submit = async () => {
+    if (isApiEnabled()) {
+      const serviceCode = service === 'ดูดบ่อดักไขมัน' ? 'GREASE_TRAP' : service === 'ขนส่งกากอุตสาหกรรม' ? 'INDUSTRIAL_WASTE' : 'WASTEWATER_POND';
+      try {
+        await submitCustomerBooking({ serviceCode, customerSiteId: '00000000-0000-4000-8000-000000000010', requestedDate: selectedDate, requestedStart: selectedSlot.slice(0, 5), requestedEnd: selectedSlot.slice(6), estimatedVolume: undefined });
+      } catch {
+        notify('ยังส่งคำขอไม่ได้ กรุณาลองใหม่หรือติดต่อทีม Foresee');
+        return;
+      }
+    }
+    setSubmitted(true);
+    notify('ส่งคำขอจองแล้ว ทีมงานจะยืนยันภายใน 15 นาที');
+  };
   return <><PageHeader eyebrow="พอร์ทัลลูกค้า · ไทยรุ่งอุตสาหกรรม" title={submitted ? 'ส่งคำขอจองแล้ว' : 'จองรถบริการ'} copy={submitted ? 'ทีม Foresee กำลังตรวจสอบคิวรถและจะติดต่อกลับ' : 'เลือกบริการ วันเวลา และสถานที่ที่ต้องการให้ทีม Foresee เข้าดูแล'} action={!submitted ? <span className="trust-line"><ShieldCheck size={16} /> ยืนยันคิวภายใน 15 นาที</span> : undefined} />{submitted ? <section className="panel submitted-card"><div className="submitted-icon"><Check size={27} /></div><h2>คำขอของคุณถูกส่งเรียบร้อย</h2><p>หมายเลขคำขอ <b>BK-260901-024</b><br />ทีมงานจะติดต่อกลับเพื่อยืนยันรถและเวลา</p><div><button className="primary-button" onClick={() => onNavigate('bookings')}>ดูการจองของฉัน <ArrowRight size={16} /></button><button className="secondary-button" onClick={() => setSubmitted(false)}>สร้างการจองอีกครั้ง</button></div></section> : <div className="customer-booking-layout"><section className="panel booking-form-panel"><div className="stepper"><div className="step active"><b>01</b><span>บริการและสถานที่</span></div><i /><div className="step active"><b>02</b><span>วันและเวลา</span></div><i /><div className="step"><b>03</b><span>ยืนยันรายละเอียด</span></div></div><section className="form-section"><div className="form-title"><div><h2>เลือกประเภทบริการ</h2><p>เลือกบริการที่ตรงกับงานของคุณ</p></div><b>* จำเป็น</b></div><div className="service-cards">{services.map((item) => <button key={item.name} className={service === item.name ? `service-card selected ${item.tone}` : 'service-card'} onClick={() => setService(item.name)}><span className={`service-icon ${item.tone}`}>{item.icon}</span><span><b>{item.name}</b><small>{item.detail}</small></span>{service === item.name && <Check size={15} />}</button>)}</div></section><section className="form-section"><div className="form-title"><div><h2>เลือกวันและเวลาที่สะดวก</h2><p>แสดงเฉพาะช่วงเวลาที่เปิดรับบริการ</p></div><b>* จำเป็น</b></div><div className="booking-month"><button className="icon-button small"><ArrowLeft size={15} /></button><b>กันยายน 2569</b><button className="icon-button small"><ArrowRight size={15} /></button></div><div className="availability-days">{days.map((day) => <button key={day.date} disabled={day.tone === 'closed'} className={selectedDate === day.date ? 'availability-day selected' : 'availability-day'} onClick={() => { setSelectedDate(day.date); setSelectedSlot(day.tone === 'limited' ? '13:00–15:30' : '09:00–11:30'); }}><span>{day.label}</span><b>{day.state}</b></button>)}</div><div className="slot-area"><span>ช่วงเวลาของวันที่ {formatThaiDate(selectedDate)}</span><div>{slots.length ? slots.map((slot) => <button key={slot} className={selectedSlot === slot ? 'slot selected' : 'slot'} onClick={() => setSelectedSlot(slot)}><Clock3 size={14} />{slot}<small>คิวว่าง</small></button>) : <div className="empty-slot">วันนี้เต็มแล้ว ลองเลือกวันที่ใกล้เคียง</div>}</div></div></section><section className="form-section"><div className="form-title"><div><h2>ยืนยันสถานที่เข้าบริการ</h2><p>ทีมงานจะใช้ข้อมูลนี้สำหรับเตรียมเส้นทาง</p></div><b>* จำเป็น</b></div><label className="field-label">สถานที่ / ชื่อโรงงาน<div className="field-control"><MapPin size={15} /><input defaultValue="โรงงาน ไทยรุ่ง — บางปะกง, ฉะเชิงเทรา" /></div></label><label className="field-label">ปริมาณโดยประมาณ <span>(ถ้ามี)</span><div className="inline-fields"><input placeholder="เช่น 8" /><select defaultValue="ลบ.ม."><option>ลบ.ม.</option><option>ตัน</option><option>เที่ยว</option></select></div></label><label className="field-label">หมายเหตุเพิ่มเติม <span>(ถ้ามี)</span><textarea rows={3} placeholder="เช่น ต้องเข้าทางประตู 2, ติดต่อคุณ..." /></label></section></section><aside className="customer-summary"><section className="panel summary-card"><span className="summary-kicker">สรุปการจอง</span><h2>พร้อมให้เราเข้าดูแล</h2><div className="summary-service"><span className="service-icon teal">≋</span><div><small>บริการที่เลือก</small><b>{service}</b></div></div><div className="summary-details"><div><span>วันเวลา</span><b>{formatThaiDate(selectedDate)}<br />{selectedSlot}</b></div><div><span>สถานที่</span><b>โรงงาน ไทยรุ่ง<br />บางปะกง, ฉะเชิงเทรา</b></div></div><div className="summary-note"><ShieldCheck size={15} /><p>เราจะยืนยันรถและเวลาที่เหมาะสมให้ภายใน 15 นาที</p></div><button className="primary-button full-button" onClick={submit}>ส่งคำขอจอง <ArrowRight size={16} /></button></section><section className="panel recent-card"><div className="panel-head"><div><h3>การจองล่าสุด</h3><p>รายการที่กำลังดำเนินการ</p></div><em className="status-chip status-pending">รอยืนยัน</em></div><div className="recent-booking"><b>27</b><span>ส.ค.</span><div><strong>ขนส่งกากอุตสาหกรรม</strong><small>13:00–15:30 · BK-260827-016</small></div></div><button className="quiet-button" onClick={() => onNavigate('bookings')}>ดูการจองของฉัน <ArrowRight size={15} /></button></section></aside></div>}</>;
 }
 
@@ -313,4 +342,3 @@ function CustomerBookings({ bookings, onNavigate }: { bookings: Booking[]; onNav
 }
 
 function CustomerCompany({ notify }: { notify: (message: string) => void }) { return <><PageHeader eyebrow="พอร์ทัลลูกค้า · การตั้งค่า" title="ข้อมูลบริษัท" copy="ข้อมูลนี้ใช้สำหรับการจองและเตรียมเส้นทางเข้าบริการ" /><section className="panel company-profile"><div className="profile-heading"><div className="company-badge">TR</div><div><h2>บริษัท ไทยรุ่งอุตสาหกรรม</h2><p>Customer organization · สมาชิก 3 คน</p></div><button className="secondary-button" onClick={() => notify('เปิดโหมดแก้ไขข้อมูลบริษัท')}>แก้ไขข้อมูล</button></div><div className="profile-fields"><div><span>เลขประจำตัวผู้เสียภาษี</span><b>0105560123456</b></div><div><span>ผู้ประสานงานหลัก</span><b>ธนกร รุ่งเรือง · 08x-xxx-xxxx</b></div><div><span>สถานที่เข้าบริการหลัก</span><b>โรงงาน ไทยรุ่ง — บางปะกง, ฉะเชิงเทรา</b></div><div><span>อีเมลแจ้งเตือน</span><b>contact@thairung.example</b></div></div></section></>; }
-

@@ -28,8 +28,34 @@ services:
     ports:
       - "3000:3000"
     depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  migrate:
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-forsee}:${POSTGRES_PASSWORD:-forsee_local}@postgres:5432/${POSTGRES_DB:-forsee}?schema=public
+    command: ["./node_modules/.bin/prisma", "migrate", "deploy", "--schema=./prisma/schema.prisma"]
+    depends_on:
       postgres:
         condition: service_healthy
+
+  seed:
+    profiles: ["seed"]
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-forsee}:${POSTGRES_PASSWORD:-forsee_local}@postgres:5432/${POSTGRES_DB:-forsee}?schema=public
+      SEED_SCOPE: ${SEED_SCOPE:-core,demo}
+    command: ["./node_modules/.bin/tsx", "./seeds/seed-runner.ts"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
 
   web:
     build:
