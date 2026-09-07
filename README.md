@@ -31,7 +31,7 @@ pnpm db:seed
 pnpm dev
 ```
 
-เปิด `http://localhost:5173` และ API docs ที่ `http://localhost:3000/docs` เมื่อเปิด API แยกด้วย `pnpm dev:api` หากต้องการให้ UI ดึงข้อมูลจริง ให้ตั้ง `VITE_API_ENABLED=true`; ค่าเริ่มต้น `false` จะใช้ demo fixture ที่ deterministic เพื่อให้เปิดดู UI ได้โดยไม่ต้องมีฐานข้อมูล
+เปิด `http://localhost:5173` และ API docs ที่ `http://localhost:3000/docs` เมื่อเปิด API แยกด้วย `pnpm dev:api` ค่าเริ่มต้นใน `.env.example` จะเชื่อมข้อมูลจริง หากต้องการเปิดเฉพาะ UI โดยไม่ใช้ฐานข้อมูล ให้ตั้ง `VITE_API_ENABLED=false`
 
 ## Docker workflow
 
@@ -39,6 +39,14 @@ pnpm dev
 docker compose -f infra/compose.yaml up --build
 docker compose -f infra/compose.yaml --profile seed run --build --rm seed
 ```
+
+หรือเริ่ม stack พร้อม seed ในคำสั่งเดียว:
+
+```bash
+docker compose -f infra/compose.yaml --profile seed up --build
+```
+
+ถ้าเครื่องมี Docker Compose แบบ legacy ให้ใช้ `docker-compose` แทน `docker compose` ในคำสั่งด้านบน
 
 Compose แยก `migrate` เป็น one-off job และให้ `api` เริ่มหลัง migration สำเร็จ ไม่ให้ replica แต่ละตัวแข่งกัน migrate เอง
 
@@ -86,6 +94,8 @@ Backend ตรวจสิทธิ์ทุก route ด้วย session cooki
 - `OWNER`, `ADMIN`, `STAFF` เข้า operations routes
 - `CUSTOMER` เข้า customer booking/site/availability routes
 - ทุก query ฝั่งลูกค้าต้อง scope ด้วย `organizationId` จาก session ห้ามรับ organization จาก client
+
+ใน demo นี้ `OWNER` คือเจ้าของ/ผู้ดูแลสูงสุดขององค์กรฝั่งบริษัท, `ADMIN` และ `STAFF` คือทีมปฏิบัติการ, ส่วน `CUSTOMER` คือผู้จองขององค์กรลูกค้า
 
 ## Known local limitation
 

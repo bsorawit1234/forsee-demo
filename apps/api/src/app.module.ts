@@ -10,7 +10,7 @@ import { HealthController } from './modules/health/health.controller.js';
 import { CommonModule } from './common/common.module.js';
 
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true }), DatabaseModule, CommonModule, AuthModule, CatalogModule, BookingModule, OperationsModule, EventsModule],
+  imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: ['.env', '../../.env'] }), DatabaseModule, CommonModule, AuthModule, CatalogModule, BookingModule, OperationsModule, EventsModule],
   controllers: [HealthController],
 })
 export class AppModule {}

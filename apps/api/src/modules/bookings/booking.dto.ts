@@ -29,6 +29,11 @@ export class CreateBookingDto {
   @Max(100000)
   estimatedVolume?: number;
 
+  @ApiPropertyOptional({ example: 'ลบ.ม.', type: String })
+  @IsOptional()
+  @IsString()
+  volumeUnit?: string;
+
   @ApiPropertyOptional({ example: 'เข้าทางประตูฝั่งตะวันออก', type: String })
   @IsOptional()
   @IsString()

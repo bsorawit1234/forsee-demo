@@ -72,12 +72,9 @@ export class CatalogController {
         select: { requestedStartAt: true, requestedEndAt: true },
       }),
     ]);
-    const rule = ruleCandidates.sort((left, right) => {
-      const specificity = (candidate: typeof left) => (candidate.serviceTypeId ? 4 : 0) + (candidate.vehicleTypeId ? 2 : 0) + (candidate.dayOfWeek === null ? 0 : 1);
-      return specificity(right) - specificity(left) || right.maxConcurrent - left.maxConcurrent;
-    })[0];
+    const specificity = (candidate: typeof ruleCandidates[number]) => (candidate.serviceTypeId ? 4 : 0) + (candidate.vehicleTypeId ? 2 : 0) + (candidate.dayOfWeek === null ? 0 : 1);
     const fleetSize = vehicles.length;
-    const policyCapacity = rule?.maxConcurrent ?? fleetSize;
+    const policyCapacity = ruleCandidates.sort((left, right) => specificity(right) - specificity(left) || right.maxConcurrent - left.maxConcurrent)[0]?.maxConcurrent ?? fleetSize;
     const capacity = Math.max(0, Math.min(policyCapacity, fleetSize));
     const duration = service.defaultDurationMinutes;
     const slots = [];
@@ -86,7 +83,15 @@ export class CatalogController {
       const end = new Date(start.getTime() + duration * 60_000);
       const used = bookings.filter((booking) => booking.requestedStartAt < end && booking.requestedEndAt > start).length;
       const maintenanceCount = vehicles.filter((vehicle) => vehicle.maintenance.some((window) => window.startsAt < end && window.endsAt > start)).length;
-      const slotCapacity = Math.max(0, Math.min(policyCapacity, fleetSize - maintenanceCount));
+      const slotRule = ruleCandidates.filter((candidate) => {
+        const toMinutes = (value: string | null) => value ? Number(value.slice(0, 2)) * 60 + Number(value.slice(3, 5)) : null;
+        const ruleStart = toMinutes(candidate.startTime);
+        const ruleEnd = toMinutes(candidate.endTime);
+        const slotStart = minutes;
+        const slotEnd = minutes + duration;
+        return (ruleStart === null || slotStart >= ruleStart) && (ruleEnd === null || slotEnd <= ruleEnd);
+      }).sort((left, right) => specificity(right) - specificity(left) || right.maxConcurrent - left.maxConcurrent)[0];
+      const slotCapacity = Math.max(0, Math.min(slotRule?.maxConcurrent ?? policyCapacity, fleetSize - maintenanceCount));
       slots.push({ start: start.toISOString(), end: end.toISOString(), capacity: slotCapacity, available: used < slotCapacity, remaining: Math.max(slotCapacity - used, 0) });
     }
     return { date: query.date, serviceCode: service.code, vehicleType: service.requiredVehicleType.nameTh, fleetSize, capacity, slots };

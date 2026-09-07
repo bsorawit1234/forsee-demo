@@ -24,12 +24,18 @@ services:
       NODE_ENV: development
       API_PORT: 3000
       WEB_ORIGIN: http://localhost:5173
+      SESSION_SECRET: ${SESSION_SECRET:-local-only-session-secret}
       DATABASE_URL: postgresql://${POSTGRES_USER:-forsee}:${POSTGRES_PASSWORD:-forsee_local}@postgres:5432/${POSTGRES_DB:-forsee}?schema=public
     ports:
       - "3000:3000"
     depends_on:
       migrate:
         condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/health/ready').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
 
   migrate:
     build:
@@ -65,7 +71,7 @@ services:
       - "5173:80"
     depends_on:
       api:
-        condition: service_started
+        condition: service_healthy
 
 volumes:
   forsee_postgres_data:

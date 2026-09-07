@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { confirmOperationBooking, fetchCustomerAvailability, fetchOperationsBookings, fetchOperationsVehicles, isApiEnabled, submitCustomerBooking, watchOperationEvents, type ApiAvailabilityResponse, type ApiBooking, type ApiVehicle } from './lib/api';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { advanceOperationBooking, assignOperationBooking, confirmOperationBooking, fetchCustomerAvailability, fetchCustomerBookings, fetchCustomerSites, fetchOperationsBookings, fetchOperationsVehicles, isApiEnabled, loginDemo, submitCustomerBooking, watchOperationEvents, type ApiAvailabilityResponse, type ApiBooking, type ApiSessionUser, type ApiVehicle } from './lib/api';
 import { formatThaiDate } from './lib/format';
 import {
   AlertTriangle,
@@ -51,6 +51,8 @@ type Booking = {
   status: BookingStatus;
   stage: JobStage;
   sla: 'ปกติ' | 'ต้องติดตาม' | 'เกินกำหนด';
+  customerNote?: string;
+  recordVersion?: number;
 };
 
 type VehicleResource = {
@@ -61,6 +63,20 @@ type VehicleResource = {
   status: 'ว่าง' | 'กำลังใช้งาน' | 'ซ่อมบำรุง' | 'ไม่พร้อมใช้งาน';
   bookingId?: string | null;
 };
+
+function bangkokIsoDate(value = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Bangkok', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(value).reduce<Record<string, string>>((result, part) => { result[part.type] = part.value; return result; }, {});
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+function addIsoDays(date: string, amount: number) {
+  const value = new Date(`${date}T00:00:00+07:00`);
+  value.setUTCDate(value.getUTCDate() + amount);
+  return bangkokIsoDate(value);
+}
+
+const todayIso = bangkokIsoDate();
+const tomorrowIso = addIsoDays(todayIso, 1);
 
 const demoVehicles: VehicleResource[] = [
   { id: 'demo-vacuum-1001', registrationNumber: 'ฟส-1001', name: 'รถดูดสูญญากาศ 10 ลบ.ม.', type: 'รถดูดสูญญากาศ 10 ลบ.ม.', status: 'กำลังใช้งาน', bookingId: 'BK-260829-018' },
@@ -118,7 +134,7 @@ function toUiBooking(item: ApiBooking): Booking {
   const statuses: Record<string, BookingStatus> = { PENDING_CONFIRMATION: 'รอยืนยัน', CONFIRMED: 'ยืนยันแล้ว', REJECTED: 'รอยืนยัน', CANCELLED: 'เสร็จสิ้น' };
   const stages: Record<string, JobStage> = { SCHEDULED: 'รอเริ่มงาน', EN_ROUTE: 'กำลังเดินทาง', ARRIVED: 'ถึงหน้างาน', IN_SERVICE: 'กำลังให้บริการ', COMPLETED: 'เสร็จสิ้น' };
   const status = item.jobStage === 'IN_SERVICE' ? 'กำลังดำเนินการ' : item.jobStage === 'COMPLETED' ? 'เสร็จสิ้น' : statuses[item.bookingStatus] ?? 'ยืนยันแล้ว';
-  return { id: item.bookingNumber, recordId: item.id, customer: item.customer ?? 'ไม่ระบุลูกค้า', service: item.service ?? 'ไม่ระบุบริการ', site: item.site ?? 'ไม่ระบุสถานที่', date: thaiDate, start: clock(start), end: clock(end), vehicle: item.vehicle ?? 'ยังไม่จัดรถ', vehicleId: item.vehicleId ?? undefined, vehicleRegistrationNumber: item.vehicleRegistrationNumber ?? undefined, vehicleType: item.vehicleType ?? undefined, driver: item.vehicle ? 'ทีมภาคสนาม' : 'ยังไม่จัดทีม', status, stage: stages[item.jobStage] ?? 'รอเริ่มงาน', sla: item.slaHealth === 'OVERDUE' ? 'เกินกำหนด' : item.slaHealth === 'AT_RISK' ? 'ต้องติดตาม' : 'ปกติ' };
+  return { id: item.bookingNumber, recordId: item.id, customer: item.customer ?? 'ไม่ระบุลูกค้า', service: item.service ?? 'ไม่ระบุบริการ', site: item.site ?? 'ไม่ระบุสถานที่', date: thaiDate, start: clock(start), end: clock(end), vehicle: item.vehicle ?? 'ยังไม่จัดรถ', vehicleId: item.vehicleId ?? undefined, vehicleRegistrationNumber: item.vehicleRegistrationNumber ?? undefined, vehicleType: item.vehicleType ?? undefined, driver: item.vehicle ? 'ทีมภาคสนาม' : 'ยังไม่จัดทีม', status, stage: stages[item.jobStage] ?? 'รอเริ่มงาน', sla: item.slaHealth === 'OVERDUE' ? 'เกินกำหนด' : item.slaHealth === 'AT_RISK' ? 'ต้องติดตาม' : 'ปกติ', customerNote: item.customerNote ?? undefined, recordVersion: item.version };
 }
 
 function toUiVehicle(item: ApiVehicle): VehicleResource {
@@ -137,15 +153,26 @@ export default function App() {
   const [vehicles, setVehicles] = useState(demoVehicles);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [toast, setToast] = useState('');
+  const [session, setSession] = useState<ApiSessionUser | null>(null);
+  const [liveMode, setLiveMode] = useState(false);
+  const eventStopRef = useRef<() => void>(() => undefined);
 
   useEffect(() => {
     if (!isApiEnabled()) return undefined;
     let mounted = true;
-    const refresh = () => fetchOperationsBookings().then((result) => { if (mounted && result.items.length) setBookings(result.items.map(toUiBooking)); }).catch(() => undefined);
-    refresh();
-    fetchOperationsVehicles().then((result) => { if (mounted && result.items.length) setVehicles(result.items.map(toUiVehicle)); }).catch(() => undefined);
-    const stop = watchOperationEvents(refresh);
-    return () => { mounted = false; stop(); };
+    let stop: () => void = () => undefined;
+    const refresh = () => Promise.all([fetchOperationsBookings(), fetchOperationsVehicles()]).then(([bookingResult, vehicleResult]) => {
+      if (!mounted) return;
+      setBookings(bookingResult.items.map(toUiBooking));
+      setVehicles(vehicleResult.items.map(toUiVehicle));
+      setLiveMode(true);
+    }).catch(() => undefined);
+    loginDemo('company').then(({ user }) => {
+      if (!mounted) return;
+      setSession(user);
+      return refresh().then(() => { if (mounted) { stop = watchOperationEvents(() => { void refresh(); }); eventStopRef.current = stop; } });
+    }).catch(() => { if (mounted) setLiveMode(false); });
+    return () => { mounted = false; stop(); eventStopRef.current = () => undefined; };
   }, []);
 
   const notify = (message: string) => {
@@ -153,11 +180,45 @@ export default function App() {
     window.setTimeout(() => setToast(''), 2800);
   };
 
-  const switchPortal = (value: Portal) => {
-    setPortal(value);
+  const switchPortal = async (value: Portal) => {
     setSelectedBooking(null);
-    if (value === 'company') setCompanyView('overview');
-    if (value === 'customer') setCustomerView('new-booking');
+    eventStopRef.current();
+    eventStopRef.current = () => undefined;
+    if (isApiEnabled()) {
+      try {
+        const { user } = await loginDemo(value);
+        setSession(user);
+        if (value === 'company') {
+          const [bookingResult, vehicleResult] = await Promise.all([fetchOperationsBookings(), fetchOperationsVehicles()]);
+          setBookings(bookingResult.items.map(toUiBooking));
+          setVehicles(vehicleResult.items.map(toUiVehicle));
+          setCompanyView('overview');
+          eventStopRef.current = watchOperationEvents(() => {
+            void fetchOperationsBookings().then((result) => setBookings(result.items.map(toUiBooking))).catch(() => undefined);
+          });
+        } else {
+          const result = await fetchCustomerBookings();
+          setBookings(result.items.map(toUiBooking));
+          setCustomerView('new-booking');
+          eventStopRef.current = watchOperationEvents(() => {
+            void fetchCustomerBookings().then((next) => setBookings(next.items.map(toUiBooking))).catch(() => undefined);
+          });
+        }
+        setLiveMode(true);
+    } catch {
+      setSession(null);
+      notify('เชื่อมต่อข้อมูลจริงไม่ได้ จึงใช้โหมดสาธิต');
+      setLiveMode(false);
+      if (value === 'customer') setBookings(seedBookings.filter((item) => item.customer.includes('ไทยรุ่ง')));
+      else setBookings(seedBookings);
+      }
+    } else {
+      setCustomerView(value === 'customer' ? 'new-booking' : customerView);
+      setCompanyView(value === 'company' ? 'overview' : companyView);
+      if (value === 'customer') setBookings(seedBookings.filter((item) => item.customer.includes('ไทยรุ่ง')));
+      else setBookings(seedBookings);
+    }
+    setPortal(value);
   };
 
   const updateBooking = (booking: Booking) => {
@@ -166,12 +227,57 @@ export default function App() {
     notify(`อัปเดต ${booking.id} แล้ว`);
   };
 
+  const assignBooking = async (booking: Booking, vehicle: VehicleResource) => {
+    if (isApiEnabled() && booking.recordId) {
+      try {
+        const result = await assignOperationBooking(booking.recordId, { vehicleId: vehicle.id });
+        const updated = toUiBooking(result);
+        setBookings((current) => current.map((item) => item.id === booking.id ? updated : item));
+        setSelectedBooking(updated);
+        notify(`จัดรถ ${vehicle.registrationNumber} ให้ ${booking.id} แล้ว`);
+        return true;
+      } catch (error) {
+        notify(error instanceof Error ? error.message : 'จัดรถไม่สำเร็จ');
+        return false;
+      }
+    }
+    updateBooking({ ...booking, vehicle: vehicle.name, vehicleId: vehicle.id, vehicleRegistrationNumber: vehicle.registrationNumber, vehicleType: vehicle.type });
+    return true;
+  };
+
+  const advanceBooking = async (booking: Booking) => {
+    if (isApiEnabled() && booking.recordId) {
+      try {
+        const result = await advanceOperationBooking(booking.recordId);
+        const updated = toUiBooking(result);
+        setBookings((current) => current.map((item) => item.id === booking.id ? updated : item));
+        setSelectedBooking(updated);
+        notify(`อัปเดตสถานะ ${booking.id} แล้ว`);
+        return true;
+      } catch (error) {
+        notify(error instanceof Error ? error.message : 'อัปเดตสถานะไม่สำเร็จ');
+        return false;
+      }
+    }
+    const next: Record<JobStage, JobStage> = { 'รอเริ่มงาน': 'กำลังเดินทาง', 'กำลังเดินทาง': 'ถึงหน้างาน', 'ถึงหน้างาน': 'กำลังให้บริการ', 'กำลังให้บริการ': 'เสร็จสิ้น', 'เสร็จสิ้น': 'เสร็จสิ้น' };
+    const nextStage = next[booking.stage];
+    updateBooking({ ...booking, stage: nextStage, status: nextStage === 'เสร็จสิ้น' ? 'เสร็จสิ้น' : nextStage === 'รอเริ่มงาน' ? booking.status : 'กำลังดำเนินการ' });
+    return true;
+  };
+
+  const handleBookingCreated = (booking: Booking) => {
+    setBookings((current) => [booking, ...current.filter((item) => item.id !== booking.id)]);
+    setSelectedBooking(booking);
+    notify(`สร้าง ${booking.id} แล้ว`);
+  };
+
   const confirmBooking = async (booking: Booking) => {
     if (isApiEnabled() && booking.recordId) {
       try {
         const result = await confirmOperationBooking(booking.recordId);
         const confirmed = toUiBooking(result);
         setBookings((current) => current.map((item) => (item.id === booking.id ? confirmed : item)));
+        setSelectedBooking(confirmed);
         notify(`ยืนยันข้อมูล ${booking.id} แล้ว`);
         return true;
       } catch {
@@ -179,7 +285,9 @@ export default function App() {
         return false;
       }
     }
-    setBookings((current) => current.map((item) => (item.id === booking.id ? { ...booking, status: 'ยืนยันแล้ว' } : item)));
+    const confirmed = { ...booking, status: 'ยืนยันแล้ว' as BookingStatus };
+    setBookings((current) => current.map((item) => (item.id === booking.id ? confirmed : item)));
+    setSelectedBooking(confirmed);
     notify(`ยืนยันข้อมูล ${booking.id} แล้ว`);
     return true;
   };
@@ -192,9 +300,12 @@ export default function App() {
           bookings={bookings}
           vehicles={vehicles}
           selectedBooking={selectedBooking}
+          session={session}
+          liveMode={liveMode}
           onNavigate={setCompanyView}
           onSelectBooking={setSelectedBooking}
-          onUpdateBooking={updateBooking}
+          onAssignBooking={assignBooking}
+          onAdvanceBooking={advanceBooking}
           onConfirmBooking={confirmBooking}
           onSwitchPortal={switchPortal}
           notify={notify}
@@ -203,8 +314,10 @@ export default function App() {
         <CustomerPortal
           view={customerView}
           bookings={bookings}
+          session={session}
           onNavigate={setCustomerView}
           onSwitchPortal={switchPortal}
+          onBookingCreated={handleBookingCreated}
           notify={notify}
         />
       )}
@@ -218,9 +331,12 @@ function CompanyPortal({
   bookings,
   vehicles,
   selectedBooking,
+  session,
+  liveMode,
   onNavigate,
   onSelectBooking,
-  onUpdateBooking,
+  onAssignBooking,
+  onAdvanceBooking,
   onConfirmBooking,
   onSwitchPortal,
   notify,
@@ -229,9 +345,12 @@ function CompanyPortal({
   bookings: Booking[];
   vehicles: VehicleResource[];
   selectedBooking: Booking | null;
+  session: ApiSessionUser | null;
+  liveMode: boolean;
   onNavigate: (view: CompanyView) => void;
   onSelectBooking: (booking: Booking | null) => void;
-  onUpdateBooking: (booking: Booking) => void;
+  onAssignBooking: (booking: Booking, vehicle: VehicleResource) => Promise<boolean>;
+  onAdvanceBooking: (booking: Booking) => Promise<boolean>;
   onConfirmBooking: (booking: Booking) => boolean | Promise<boolean>;
   onSwitchPortal: (portal: Portal) => void;
   notify: (message: string) => void;
@@ -247,20 +366,20 @@ function CompanyPortal({
         </nav>
         <div className="nav-caption nav-caption-gap">จัดการระบบ</div>
         <nav className="side-nav"><button className="nav-link" onClick={() => notify('ตั้งค่าระบบจะเปิดในเวอร์ชันถัดไป')}><Settings2 size={17} /><span>ตั้งค่าระบบ</span></button><button className="nav-link" onClick={() => notify('ศูนย์ช่วยเหลือพร้อมให้บริการ')}><ShieldCheck size={17} /><span>ช่วยเหลือ</span></button></nav>
-        <div className="sidebar-bottom"><div className="support-box"><span><ShieldCheck size={16} /></span><div><b>ระบบทำงานปกติ</b><small>อัปเดตล่าสุดเมื่อ 10:42 น.</small></div></div><div className="account"><div className="avatar avatar-gold">อน</div><div><b>อนุชา วัฒนกุล</b><small>Owner</small></div><MoreHorizontal size={17} /></div></div>
+        <div className="sidebar-bottom"><div className="support-box"><span><ShieldCheck size={16} /></span><div><b>ระบบทำงานปกติ</b><small>อัปเดตล่าสุดเมื่อ 10:42 น.</small></div></div><div className="account"><div className="avatar avatar-gold">{session?.displayName?.slice(0, 2) ?? 'อน'}</div><div><b>{session?.displayName ?? 'อนุชา วัฒนกุล'}</b><small>{session?.role ?? 'OWNER'}</small></div><MoreHorizontal size={17} /></div></div>
       </aside>
       <main className="main-pane">
-        <header className="topbar"><button className="mobile-menu" aria-label="เปิดเมนู"><Menu size={20} /></button><div className="breadcrumbs"><span>ศูนย์ปฏิบัติการ</span><b>/</b><strong>{companyNav.find((item) => item.id === view)?.label}</strong></div><div className="topbar-actions"><div className="live-indicator"><i />ข้อมูลอัปเดตสด</div><PortalSwitcher portal="company" onChange={onSwitchPortal} /><button className="icon-button" aria-label="ค้นหา" onClick={() => notify('ค้นหาได้จากหน้า Booking Monitor')}><Search size={17} /></button><button className="icon-button has-notification" aria-label="การแจ้งเตือน" onClick={() => notify('มี 2 รายการที่ต้องติดตาม')}><Bell size={17} /></button></div></header>
+        <header className="topbar"><button className="mobile-menu" aria-label="เปิดเมนู"><Menu size={20} /></button><div className="breadcrumbs"><span>ศูนย์ปฏิบัติการ</span><b>/</b><strong>{companyNav.find((item) => item.id === view)?.label}</strong></div><div className="topbar-actions"><div className="live-indicator"><i />{liveMode ? 'ข้อมูลอัปเดตสด' : 'โหมดสาธิต'}</div><PortalSwitcher portal="company" onChange={onSwitchPortal} /><button className="icon-button" aria-label="ค้นหา" onClick={() => notify('ค้นหาได้จากหน้า Booking Monitor')}><Search size={17} /></button><button className="icon-button has-notification" aria-label="การแจ้งเตือน" onClick={() => notify('มี 2 รายการที่ต้องติดตาม')}><Bell size={17} /></button></div></header>
         <div className="content-area">
           {view === 'overview' && <CompanyOverview bookings={bookings} onSelectBooking={onSelectBooking} onNavigate={onNavigate} onConfirmBooking={onConfirmBooking} notify={notify} />}
           {view === 'bookings' && <BookingMonitor bookings={bookings} onSelectBooking={onSelectBooking} onNavigate={onNavigate} onConfirmBooking={onConfirmBooking} />}
-          {view === 'calendar' && <OperationsCalendar bookings={bookings} vehicles={vehicles} onSelectBooking={onSelectBooking} onUpdateBooking={onUpdateBooking} notify={notify} />}
+          {view === 'calendar' && <OperationsCalendar bookings={bookings} vehicles={vehicles} onSelectBooking={onSelectBooking} onAssignBooking={onAssignBooking} notify={notify} />}
           {view === 'fleet' && <FleetView bookings={bookings} vehicles={vehicles} notify={notify} />}
           {view === 'customers' && <CustomersView bookings={bookings} onSelectBooking={onSelectBooking} />}
           {view === 'reports' && <ReportsView bookings={bookings} />}
         </div>
       </main>
-      {selectedBooking && <BookingDrawer booking={selectedBooking} onClose={() => onSelectBooking(null)} onUpdate={onUpdateBooking} onConfirmBooking={onConfirmBooking} />}
+      {selectedBooking && <BookingDrawer booking={selectedBooking} onClose={() => onSelectBooking(null)} onConfirmBooking={onConfirmBooking} onAdvanceBooking={onAdvanceBooking} />}
     </div>
   );
 }
@@ -270,13 +389,13 @@ function PortalSwitcher({ portal, onChange }: { portal: Portal; onChange: (porta
 }
 
 function CompanyOverview({ bookings, onSelectBooking, onNavigate, onConfirmBooking, notify }: { bookings: Booking[]; onSelectBooking: (booking: Booking) => void; onNavigate: (view: CompanyView) => void; onConfirmBooking: (booking: Booking) => boolean | Promise<boolean>; notify: (message: string) => void }) {
-  const today = bookings.filter((item) => item.date === '2026-08-29');
-  const unassigned = bookings.filter((item) => item.vehicle === 'ยังไม่จัดรถ');
+  const today = bookings.filter((item) => item.date === todayIso);
+  const unassigned = today.filter((item) => item.vehicle === 'ยังไม่จัดรถ');
   const atRisk = bookings.filter((item) => item.sla !== 'ปกติ');
   return <>
-    <PageHeader eyebrow="วันเสาร์ที่ 29 สิงหาคม 2569 · อัปเดตล่าสุด 10:42 น." title="การดำเนินงานวันนี้" copy="ติดตาม Booking และทีมภาคสนามจากจุดเดียว" action={<button className="primary-button" onClick={() => onNavigate('bookings')}><Plus size={17} /> สร้างการจอง</button>} />
-    <div className="toolbar"><div className="toolbar-search"><Search size={16} /><input placeholder="ค้นหาเลข Booking, ลูกค้า หรือสถานที่" /></div><button className="filter-button" onClick={() => notify('ตัวกรองพร้อมใช้งานในหน้า Booking Monitor')}><Filter size={15} /> ตัวกรอง</button><button className="date-button"><CalendarDays size={15} /> 29 ส.ค. 2569 <ChevronDown size={14} /></button></div>
-    <div className="metric-strip"><Metric label="งานวันนี้" value={String(today.length).padStart(2, '0')} note="Booking ทั้งหมด" tone="teal" icon={<CalendarDays size={17} />} /><Metric label="กำลังดำเนินการ" value="08" note="จาก 24 งาน" tone="amber" icon={<Clock3 size={17} />} /><Metric label="ยังไม่จัดรถ" value={String(unassigned.length).padStart(2, '0')} note="ต้องจัดคิว" tone="blue" icon={<Truck size={17} />} /><Metric label="ต้องติดตาม" value={String(atRisk.length).padStart(2, '0')} note="SLA / conflict" tone="rose" icon={<AlertTriangle size={17} />} /></div>
+    <PageHeader eyebrow={`${formatThaiDate(todayIso)} · อัปเดตตามข้อมูลล่าสุด`} title="การดำเนินงานวันนี้" copy="ติดตาม Booking และทีมภาคสนามจากจุดเดียว" action={<button className="primary-button" onClick={() => onNavigate('bookings')}><Plus size={17} /> สร้างการจอง</button>} />
+    <div className="toolbar"><div className="toolbar-search"><Search size={16} /><input placeholder="ค้นหาเลข Booking, ลูกค้า หรือสถานที่" /></div><button className="filter-button" onClick={() => onNavigate('bookings')}><Filter size={15} /> ตัวกรอง</button><button className="date-button"><CalendarDays size={15} /> {formatThaiDate(todayIso)} <ChevronDown size={14} /></button></div>
+    <div className="metric-strip"><Metric label="งานวันนี้" value={String(today.length).padStart(2, '0')} note="Booking ทั้งหมด" tone="teal" icon={<CalendarDays size={17} />} /><Metric label="กำลังดำเนินการ" value={String(today.filter((item) => item.status === 'กำลังดำเนินการ').length).padStart(2, '0')} note={`จาก ${today.length} งาน`} tone="amber" icon={<Clock3 size={17} />} /><Metric label="ยังไม่จัดรถ" value={String(unassigned.length).padStart(2, '0')} note="ต้องจัดคิว" tone="blue" icon={<Truck size={17} />} /><Metric label="ต้องติดตาม" value={String(atRisk.length).padStart(2, '0')} note="SLA / conflict" tone="rose" icon={<AlertTriangle size={17} />} /></div>
     <div className="section-heading"><div><h2>งานวันนี้</h2><p>คลิก Booking เพื่อดูรายละเอียดและ timeline</p></div><button className="quiet-button" onClick={() => onNavigate('bookings')}>ดูทั้งหมด <ArrowRight size={15} /></button></div>
     <div className="split-layout"><section className="panel table-panel"><div className="panel-head"><div className="head-title"><span className="live-dot" /> Live operations</div><button className="icon-button small" onClick={() => notify('ตั้งค่าการแสดงผลในเวอร์ชันถัดไป')}><MoreHorizontal size={16} /></button></div><BookingBoard bookings={today} onSelectBooking={onSelectBooking} onConfirmBooking={onConfirmBooking} compact /></section><aside className="side-stack"><AttentionPanel bookings={atRisk} onSelectBooking={onSelectBooking} /><CapacityPanel bookings={bookings} /></aside></div>
     <section className="panel activity-panel"><div className="panel-head"><div><h3>กิจกรรมล่าสุด</h3><p>ความเคลื่อนไหวจากทีมและระบบ</p></div><button className="quiet-button" onClick={() => notify('เปิดประวัติกิจกรรมทั้งหมด')}>ดูทั้งหมด <ArrowRight size={15} /></button></div><div className="activity-grid"><Activity name="สมชาย ใจดี" text="เปลี่ยนสถานะเป็น กำลังให้บริการ" time="4 นาทีที่แล้ว" tone="teal" /><Activity name="วิชัย พรหมรักษา" text="เริ่มเดินทางไป มาบตาพุด, ระยอง" time="18 นาทีที่แล้ว" tone="amber" /><Activity name="ระบบ" text="มีคำขอจองใหม่จาก นอร์ทสตาร์ ฟู้ดส์" time="32 นาทีที่แล้ว" tone="violet" /></div></section>
@@ -348,7 +467,7 @@ function AttentionPanel({ bookings, onSelectBooking }: { bookings: Booking[]; on
 }
 
 function CapacityPanel({ bookings }: { bookings: Booking[] }) {
-  const dayCounts = ['29', '30', '31', '1', '2'].map((day, index) => ({ day, count: bookings.filter((booking) => booking.date === ['2026-08-29', '2026-08-30', '2026-08-31', '2026-09-01', '2026-09-02'][index]).length }));
+  const dayCounts = [0, 1, 2, 3, 4].map((offset) => { const date = addIsoDays(todayIso, offset); return { day: formatThaiDate(date), count: bookings.filter((booking) => booking.date === date).length }; });
   return <section className="panel capacity-panel"><div className="panel-head"><div><h3>Capacity สัปดาห์นี้</h3><p>จำนวนงานที่วางไว้ในแต่ละวัน</p></div><CalendarDays size={16} className="muted-icon" /></div><div className="capacity-bars">{dayCounts.map((item, index) => <div key={`${item.day}-${index}`}><span>{item.day}</span><div className="bar-track"><i style={{ width: `${Math.min(100, 24 + item.count * 20)}%` }} /></div><b>{item.count}</b></div>)}</div><small className="capacity-note"><i /> มีพื้นที่รองรับในวันพรุ่งนี้</small></section>;
 }
 
@@ -356,10 +475,11 @@ function Activity({ name, text, time, tone }: { name: string; text: string; time
   return <div className="activity-item"><div className={`avatar avatar-${tone}`}>{name.slice(0, 2)}</div><div><p><b>{name}</b> {text}</p><small>{time}</small></div></div>;
 }
 
-function OperationsCalendar({ bookings, vehicles, onSelectBooking, onUpdateBooking, notify }: { bookings: Booking[]; vehicles: VehicleResource[]; onSelectBooking: (booking: Booking) => void; onUpdateBooking: (booking: Booking) => void; notify: (message: string) => void }) {
-  const [selectedDate, setSelectedDate] = useState('2026-08-29');
+function OperationsCalendar({ bookings, vehicles, onSelectBooking, onAssignBooking, notify }: { bookings: Booking[]; vehicles: VehicleResource[]; onSelectBooking: (booking: Booking) => void; onAssignBooking: (booking: Booking, vehicle: VehicleResource) => Promise<boolean>; notify: (message: string) => void }) {
+  const [selectedDate, setSelectedDate] = useState(todayIso);
   const [calendarMode, setCalendarMode] = useState<'month' | 'day'>('month');
-  const [calendarMonth, setCalendarMonth] = useState({ year: 2026, month: 7 });
+  const todayDate = new Date(`${todayIso}T00:00:00`);
+  const [calendarMonth, setCalendarMonth] = useState({ year: todayDate.getFullYear(), month: todayDate.getMonth() });
   const selectedBookings = bookings.filter((booking) => booking.date === selectedDate);
   const assignable = selectedBookings.find((booking) => booking.vehicle === 'ยังไม่จัดรถ');
   const monthLabel = useMemo(() => new Intl.DateTimeFormat('th-TH', { month: 'long', year: 'numeric' }).format(new Date(calendarMonth.year, calendarMonth.month, 1)), [calendarMonth]);
@@ -381,13 +501,13 @@ function OperationsCalendar({ bookings, vehicles, onSelectBooking, onUpdateBooki
   };
   return <>
     <PageHeader eyebrow="Company Operations Center · Scheduling" title="ปฏิทินและจัดคิว" copy="รถแต่ละประเภทมีหลายคัน จึงรับงานช่วงเวลาเดียวกันได้ตามจำนวนรถที่ว่าง" action={<button className="primary-button" onClick={() => notify('ช่องสร้าง Booking จะเปิดจาก Booking Monitor')}><Plus size={17} /> สร้างการจอง</button>} />
-    <div className="calendar-toolbar"><div className="date-navigation"><button className="icon-button small" aria-label="เดือนก่อนหน้า" onClick={() => changeMonth(-1)}><ArrowLeft size={16} /></button><button className="today-button" onClick={() => { setCalendarMonth({ year: 2026, month: 7 }); setSelectedDate('2026-08-29'); setCalendarMode('month'); }}>วันนี้</button><button className="icon-button small" aria-label="เดือนถัดไป" onClick={() => changeMonth(1)}><ArrowRight size={16} /></button><b>{monthLabel}</b></div><div className="calendar-capacity-summary"><Truck size={15} /> {vehicles.length} คันใน fleet · จองซ้อนเวลาได้ตามรถว่าง</div><div className="view-switch"><button className={calendarMode === 'month' ? 'selected' : ''} onClick={() => setCalendarMode('month')}>Month overview</button><button className={calendarMode === 'day' ? 'selected' : ''} onClick={() => setCalendarMode('day')}>Day dispatch</button></div><button className="filter-button"><Filter size={15} /> กรอง</button></div>
-    {calendarMode === 'month' ? <section className="panel company-month-capacity"><div className="company-calendar-weekdays">{['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'].map((weekday) => <span key={weekday}>{weekday}</span>)}</div><div className="company-month-grid">{monthCells.map((cell) => { const unassignedCount = cell.bookings.filter((booking) => booking.vehicle === 'ยังไม่จัดรถ').length; const activeCount = cell.bookings.length; return <button key={cell.key} disabled={!cell.isCurrentMonth} aria-label={cell.isCurrentMonth ? `${cell.day} ${activeCount} งาน` : undefined} className={`company-month-cell ${cell.isCurrentMonth ? '' : 'outside'} ${selectedDate === cell.date ? 'selected' : ''}`} onClick={() => { setSelectedDate(cell.date); setCalendarMode('day'); }}><span>{cell.day}</span>{cell.isCurrentMonth && <><b>{activeCount} งาน</b><small>{Math.max(vehicles.length - Math.min(activeCount, vehicles.length), 0)} รถว่าง</small><div className="company-day-capacity"><i style={{ width: `${Math.min(100, activeCount ? 18 + activeCount * 18 : 8)}%` }} /></div>{unassignedCount ? <em>{unassignedCount} ยังไม่จัดรถ</em> : <em>รองรับงานซ้อน</em>}</>}</button>; })}</div></section> : <DayDispatch date={selectedDate} bookings={selectedBookings} resources={vehicles} unassigned={assignable} onSelectBooking={onSelectBooking} onUpdateBooking={onUpdateBooking} notify={notify} />}
+    <div className="calendar-toolbar"><div className="date-navigation"><button className="icon-button small" aria-label="เดือนก่อนหน้า" onClick={() => changeMonth(-1)}><ArrowLeft size={16} /></button><button className="today-button" onClick={() => { setCalendarMonth({ year: todayDate.getFullYear(), month: todayDate.getMonth() }); setSelectedDate(todayIso); setCalendarMode('month'); }}>วันนี้</button><button className="icon-button small" aria-label="เดือนถัดไป" onClick={() => changeMonth(1)}><ArrowRight size={16} /></button><b>{monthLabel}</b></div><div className="calendar-capacity-summary"><Truck size={15} /> {vehicles.length} คันใน fleet · จองซ้อนเวลาได้ตามรถว่าง</div><div className="view-switch"><button className={calendarMode === 'month' ? 'selected' : ''} onClick={() => setCalendarMode('month')}>Month overview</button><button className={calendarMode === 'day' ? 'selected' : ''} onClick={() => setCalendarMode('day')}>Day dispatch</button></div><button className="filter-button"><Filter size={15} /> กรอง</button></div>
+    {calendarMode === 'month' ? <section className="panel company-month-capacity"><div className="company-calendar-weekdays">{['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'].map((weekday) => <span key={weekday}>{weekday}</span>)}</div><div className="company-month-grid">{monthCells.map((cell) => { const unassignedCount = cell.bookings.filter((booking) => booking.vehicle === 'ยังไม่จัดรถ').length; const activeCount = cell.bookings.length; return <button key={cell.key} disabled={!cell.isCurrentMonth} aria-label={cell.isCurrentMonth ? `${cell.day} ${activeCount} งาน` : undefined} className={`company-month-cell ${cell.isCurrentMonth ? '' : 'outside'} ${selectedDate === cell.date ? 'selected' : ''}`} onClick={() => { setSelectedDate(cell.date); setCalendarMode('day'); }}><span>{cell.day}</span>{cell.isCurrentMonth && <><b>{activeCount} งาน</b><small>{Math.max(vehicles.length - Math.min(activeCount, vehicles.length), 0)} รถว่าง</small><div className="company-day-capacity"><i style={{ width: `${Math.min(100, activeCount ? 18 + activeCount * 18 : 8)}%` }} /></div>{unassignedCount ? <em>{unassignedCount} ยังไม่จัดรถ</em> : <em>รองรับงานซ้อน</em>}</>}</button>; })}</div></section> : <DayDispatch date={selectedDate} bookings={selectedBookings} resources={vehicles} unassigned={assignable} onSelectBooking={onSelectBooking} onAssignBooking={onAssignBooking} notify={notify} />}
     {calendarMode === 'month' && <div className="calendar-hint"><CalendarDays size={16} /><span>เลือกวันที่เพื่อเปิด Day dispatch และจัดรถตามช่วงเวลา</span></div>}
   </>;
 }
 
-function DayDispatch({ date, bookings, resources, unassigned, onSelectBooking, onUpdateBooking, notify }: { date: string; bookings: Booking[]; resources: VehicleResource[]; unassigned?: Booking; onSelectBooking: (booking: Booking) => void; onUpdateBooking: (booking: Booking) => void; notify: (message: string) => void }) {
+function DayDispatch({ date, bookings, resources, unassigned, onSelectBooking, onAssignBooking, notify }: { date: string; bookings: Booking[]; resources: VehicleResource[]; unassigned?: Booking; onSelectBooking: (booking: Booking) => void; onAssignBooking: (booking: Booking, vehicle: VehicleResource) => Promise<boolean>; notify: (message: string) => void }) {
   const slots = ['09:00–11:30', '13:00–15:30', '15:30–18:00'];
   const matchesResourceType = (booking: Booking, resource: VehicleResource) => {
     if (booking.vehicle === 'ยังไม่จัดรถ') return false;
@@ -404,7 +524,8 @@ function DayDispatch({ date, bookings, resources, unassigned, onSelectBooking, o
     return bookings.filter((booking) => matchesResourceType(booking, resource) && booking.start === start)[resourceIndex];
   };
   const statusClassForVehicle = (status: VehicleResource['status']) => status === 'ว่าง' ? 'fleet-available' : status === 'ซ่อมบำรุง' ? 'fleet-maintenance' : status === 'กำลังใช้งาน' ? 'fleet-busy' : 'fleet-maintenance';
-  return <section className="panel dispatch-panel"><div className="panel-head"><div><h3>จัดคิวรายวัน · {formatThaiDate(date)}</h3><p>แยกเป็นรถรายคัน เพื่อเห็นงานซ้อนเวลาและรถที่ยังว่างทันที</p></div><span className="dispatch-summary">{bookings.length} งาน · {resources.length} รถ</span></div>{unassigned && <div className="unassigned-banner"><span><AlertTriangle size={15} /> ยังไม่จัดรถ</span><b>{unassigned.id} · {unassigned.customer}</b><button onClick={() => onUpdateBooking({ ...unassigned, vehicle: 'รถดูดสูญญากาศ 10 ลบ.ม.', driver: 'สมชาย ใจดี' })}>จัดรถให้รายการนี้</button></div>}<div className="dispatch-grid"><div className="resource-head">รถรายคัน / เวลา</div>{slots.map((slot) => <div className="slot-head" key={slot}>{slot}</div>)}{resources.map((resource) => <div className="dispatch-row" key={resource.id}><div className="resource-name"><Truck size={16} /><span><b>{resource.registrationNumber}</b><small>{resource.type}</small></span><em className={`fleet-status ${statusClassForVehicle(resource.status)}`}>{resource.status}</em></div>{slots.map((slot) => { const booking = bookingForCell(resource, slot); return <button className={booking ? 'dispatch-cell filled' : 'dispatch-cell'} key={`${resource.id}-${slot}`} onClick={() => booking ? onSelectBooking(booking) : notify(`รถ ${resource.registrationNumber} ว่างใน ${slot}`)}>{booking ? <><b>{booking.customer}</b><small>{booking.service}</small><em className={`stage-label ${stageClass[booking.stage]}`}>{booking.stage}</em></> : <span>ว่าง</span>}</button>; })}</div>)}</div></section>;
+  const firstAvailable = resources.find((resource) => resource.status === 'ว่าง' && resource.type.includes(unassigned?.vehicleType ?? 'รถดูดสูญญากาศ'));
+  return <section className="panel dispatch-panel"><div className="panel-head"><div><h3>จัดคิวรายวัน · {formatThaiDate(date)}</h3><p>แยกเป็นรถรายคัน เพื่อเห็นงานซ้อนเวลาและรถที่ยังว่างทันที</p></div><span className="dispatch-summary">{bookings.length} งาน · {resources.length} รถ</span></div>{unassigned && <div className="unassigned-banner"><span><AlertTriangle size={15} /> ยังไม่จัดรถ</span><b>{unassigned.id} · {unassigned.customer}</b>{firstAvailable ? <button onClick={() => { void onAssignBooking(unassigned, firstAvailable); }}>จัดรถให้ {firstAvailable.registrationNumber}</button> : <small>ยังไม่มีรถประเภทที่ตรงกัน</small>}</div>}<div className="dispatch-grid"><div className="resource-head">รถรายคัน / เวลา</div>{slots.map((slot) => <div className="slot-head" key={slot}>{slot}</div>)}{resources.map((resource) => <div className="dispatch-row" key={resource.id}><div className="resource-name"><Truck size={16} /><span><b>{resource.registrationNumber}</b><small>{resource.type}</small></span><em className={`fleet-status ${statusClassForVehicle(resource.status)}`}>{resource.status}</em></div>{slots.map((slot) => { const booking = bookingForCell(resource, slot); return <button className={booking ? 'dispatch-cell filled' : 'dispatch-cell'} key={`${resource.id}-${slot}`} onClick={() => booking ? onSelectBooking(booking) : notify(`รถ ${resource.registrationNumber} ว่างใน ${slot}`)}>{booking ? <><b>{booking.customer}</b><small>{booking.service}</small><em className={`stage-label ${stageClass[booking.stage]}`}>{booking.stage}</em></> : <span>ว่าง</span>}</button>; })}</div>)}</div></section>;
 }
 
 function FleetView({ bookings, vehicles, notify }: { bookings: Booking[]; vehicles: VehicleResource[]; notify: (message: string) => void }) {
@@ -427,7 +548,7 @@ function ReportsView({ bookings }: { bookings: Booking[] }) {
 
 function ReportBar({ label, value, max, tone }: { label: string; value: number; max: number; tone: string }) { return <div className="report-bar"><span>{label}</span><div><i className={tone} style={{ width: `${Math.max(8, (value / max) * 100)}%` }} /></div><b>{value}</b></div>; }
 
-function BookingDrawer({ booking, onClose, onUpdate, onConfirmBooking }: { booking: Booking; onClose: () => void; onUpdate: (booking: Booking) => void; onConfirmBooking: (booking: Booking) => boolean | Promise<boolean> }) {
+function BookingDrawer({ booking, onClose, onConfirmBooking, onAdvanceBooking }: { booking: Booking; onClose: () => void; onConfirmBooking: (booking: Booking) => boolean | Promise<boolean>; onAdvanceBooking: (booking: Booking) => Promise<boolean> }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [successOpen, setSuccessOpen] = useState(false);
   const [confirmBusy, setConfirmBusy] = useState(false);
@@ -445,11 +566,15 @@ function BookingDrawer({ booking, onClose, onUpdate, onConfirmBooking }: { booki
       }
       return;
     }
-    const next: Record<JobStage, JobStage> = { 'รอเริ่มงาน': 'กำลังเดินทาง', 'กำลังเดินทาง': 'ถึงหน้างาน', 'ถึงหน้างาน': 'กำลังให้บริการ', 'กำลังให้บริการ': 'เสร็จสิ้น', 'เสร็จสิ้น': 'เสร็จสิ้น' };
-    const nextStage = next[booking.stage];
-    onUpdate({ ...booking, stage: nextStage, status: nextStage === 'เสร็จสิ้น' ? 'เสร็จสิ้น' : nextStage === 'รอเริ่มงาน' ? booking.status : 'กำลังดำเนินการ' });
-    setConfirmOpen(false);
-    setSuccessOpen(true);
+    setConfirmBusy(true);
+    try {
+      if (await onAdvanceBooking(booking)) {
+        setConfirmOpen(false);
+        setSuccessOpen(true);
+      }
+    } finally {
+      setConfirmBusy(false);
+    }
   };
   return <><div className="drawer-layer" role="presentation" onMouseDown={onClose}><aside className="detail-drawer" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}><div className="drawer-header"><div><span className="eyebrow">Booking detail</span><h2>{booking.id}</h2><p>อัปเดตล่าสุดเมื่อ 4 นาทีที่แล้ว</p></div><button className="icon-button" onClick={onClose} aria-label="ปิด"><X size={18} /></button></div><div className="drawer-status"><em className={`status-chip ${statusClass[booking.status]}`}>{booking.status}</em><em className={`stage-label ${stageClass[booking.stage]}`}>{booking.stage}</em><span className={booking.sla === 'ปกติ' ? 'sla-ok' : 'sla-alert'}>{booking.sla}</span></div><section className="drawer-section"><h3>รายละเอียดงาน</h3><DetailLine icon={<Users size={15} />} label="ลูกค้า" value={booking.customer} /><DetailLine icon={<FileText size={15} />} label="บริการ" value={booking.service} /><DetailLine icon={<MapPin size={15} />} label="สถานที่" value={booking.site} /><DetailLine icon={<CalendarDays size={15} />} label="วันเวลา" value={`${formatThaiDate(booking.date)} · ${booking.start}–${booking.end}`} /></section><section className="drawer-section"><h3>รถและทีม</h3><DetailLine icon={<Truck size={15} />} label="รถ" value={booking.vehicle} /><DetailLine icon={<UserRound size={15} />} label="ผู้รับผิดชอบ" value={booking.driver} /></section><section className="drawer-section"><h3>Workflow timeline</h3><TimelineItem label="สร้างคำขอจอง" time="28 ส.ค. · 16:12" done /><TimelineItem label="ยืนยันคิว" time="28 ส.ค. · 16:27" done={booking.status !== 'รอยืนยัน'} /><TimelineItem label="เริ่มปฏิบัติงาน" time={booking.stage === 'รอเริ่มงาน' ? 'รอดำเนินการ' : 'วันนี้ · 09:04'} done={['กำลังเดินทาง', 'ถึงหน้างาน', 'กำลังให้บริการ', 'เสร็จสิ้น'].includes(booking.stage)} /><TimelineItem label="เสร็จสิ้นและส่งหลักฐาน" time={booking.stage === 'เสร็จสิ้น' ? 'วันนี้ · 11:18' : 'รอดำเนินการ'} done={booking.stage === 'เสร็จสิ้น'} /></section><div className="drawer-actions">{booking.status === 'รอยืนยัน' ? <button className="primary-button" onClick={advanceStage}><Check size={16} /> ยืนยันข้อมูลแล้ว</button> : booking.stage !== 'เสร็จสิ้น' && <button className="primary-button" onClick={advanceStage}><Check size={16} /> อัปเดตขั้นตอนถัดไป</button>}<button className="secondary-button" onClick={onClose}>ปิดรายละเอียด</button></div></aside></div>{confirmOpen && <FeedbackModal variant="confirm" title={booking.status === 'รอยืนยัน' ? 'ยืนยันข้อมูลกับลูกค้าแล้วหรือยัง?' : 'ยืนยันการอัปเดตสถานะ?'} copy={booking.status === 'รอยืนยัน' ? `หลังโทรเช็ก ${booking.customer} แล้ว ย้าย ${booking.id} ไปสถานะ “ยืนยันแล้ว”` : `อัปเดต ${booking.id} จาก “${booking.stage}” ไปขั้นตอนถัดไป`} confirmLabel={booking.status === 'รอยืนยัน' ? 'ย้ายเป็นยืนยันแล้ว' : 'ยืนยันการอัปเดต'} onConfirm={commitAdvance} onClose={() => { if (!confirmBusy) setConfirmOpen(false); }} busy={confirmBusy} />}{successOpen && <FeedbackModal variant="success" title={booking.status === 'รอยืนยัน' ? 'ยืนยัน Booking สำเร็จ' : 'อัปเดตสถานะสำเร็จ'} copy={booking.status === 'รอยืนยัน' ? `${booking.id} ถูกย้ายไปคอลัมน์ “ยืนยันแล้ว”` : `${booking.id} ถูกเลื่อนไปขั้นตอนถัดไปแล้ว`} confirmLabel="กลับไปดูรายการ" onConfirm={() => setSuccessOpen(false)} onClose={() => setSuccessOpen(false)} />}</>;
 }
@@ -461,34 +586,41 @@ function FeedbackModal({ variant, title, copy, confirmLabel, onConfirm, onClose,
   return <div className="feedback-modal-layer" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose(); }}><section className={`feedback-modal ${variant}`} role="dialog" aria-modal="true" aria-labelledby="feedback-modal-title" onMouseDown={(event) => event.stopPropagation()}><button className="feedback-modal-close" aria-label="ปิด" onClick={onClose} disabled={busy}><X size={18} /></button><div className="feedback-modal-icon"><Check size={27} /></div><span className="feedback-modal-kicker">{variant === 'confirm' ? 'ตรวจสอบรายละเอียด' : 'ดำเนินการเรียบร้อย'}</span><h2 id="feedback-modal-title">{title}</h2><p>{copy}</p>{variant === 'confirm' ? <div className="feedback-modal-actions"><button className="secondary-button" onClick={onClose} disabled={busy}>กลับไปแก้ไข</button><button className="primary-button" onClick={onConfirm} disabled={busy}>{confirmLabel}<ArrowRight size={16} /></button></div> : <button className="primary-button feedback-modal-success-button" onClick={onConfirm}>{confirmLabel}<ArrowRight size={16} /></button>}</section></div>;
 }
 
-function CustomerPortal({ view, bookings, onNavigate, onSwitchPortal, notify }: { view: CustomerView; bookings: Booking[]; onNavigate: (view: CustomerView) => void; onSwitchPortal: (portal: Portal) => void; notify: (message: string) => void }) {
+function CustomerPortal({ view, bookings, session, onNavigate, onSwitchPortal, onBookingCreated, notify }: { view: CustomerView; bookings: Booking[]; session: ApiSessionUser | null; onNavigate: (view: CustomerView) => void; onSwitchPortal: (portal: Portal) => void; onBookingCreated: (booking: Booking) => void; notify: (message: string) => void }) {
   const title = view === 'new-booking' ? 'จองบริการ' : view === 'bookings' ? 'การจองของฉัน' : 'ข้อมูลบริษัท';
   return <div className="customer-storefront">
     <header className="customer-header">
       <button className="customer-brand" onClick={() => onNavigate('new-booking')} aria-label="กลับหน้าจองบริการ"><span className="customer-brand-mark">F</span><span><strong>FORESEE</strong><small>บริการจัดการสิ่งแวดล้อม</small></span></button>
       <nav className="customer-nav" aria-label="เมนูลูกค้า">
         <button className={view === 'new-booking' ? 'customer-nav-link active' : 'customer-nav-link'} onClick={() => onNavigate('new-booking')}><Plus size={17} /> จองบริการ</button>
-        <button className={view === 'bookings' ? 'customer-nav-link active' : 'customer-nav-link'} onClick={() => onNavigate('bookings')}><FileText size={17} /> การจองของฉัน <em>{bookings.slice(0, 3).length}</em></button>
+        <button className={view === 'bookings' ? 'customer-nav-link active' : 'customer-nav-link'} onClick={() => onNavigate('bookings')}><FileText size={17} /> การจองของฉัน <em>{bookings.length}</em></button>
         <button className={view === 'company' ? 'customer-nav-link active' : 'customer-nav-link'} onClick={() => onNavigate('company')}><Users size={17} /> ข้อมูลบริษัท</button>
       </nav>
-      <div className="customer-header-actions"><button className="customer-help" onClick={() => notify('ทีม Foresee จะติดต่อกลับในไม่ช้า')}><ShieldCheck size={16} /> ช่วยเหลือ</button><PortalSwitcher portal="customer" onChange={onSwitchPortal} /><button className="customer-account" onClick={() => onNavigate('company')}><span className="customer-account-avatar">ทร</span><span><b>ธนกร รุ่งเรือง</b><small>ไทยรุ่งอุตสาหกรรม</small></span><ChevronDown size={15} /></button><button className="customer-notification" aria-label="การแจ้งเตือน" onClick={() => notify('มีการอัปเดต Booking 1 รายการ')}><Bell size={18} /></button></div>
+      <div className="customer-header-actions"><button className="customer-help" onClick={() => notify('ทีม Foresee จะติดต่อกลับในไม่ช้า')}><ShieldCheck size={16} /> ช่วยเหลือ</button><PortalSwitcher portal="customer" onChange={onSwitchPortal} /><button className="customer-account" onClick={() => onNavigate('company')}><span className="customer-account-avatar">{session?.displayName?.slice(0, 2) ?? 'ทร'}</span><span><b>{session?.displayName ?? 'ธนกร รุ่งเรือง'}</b><small>ไทยรุ่งอุตสาหกรรม</small></span><ChevronDown size={15} /></button><button className="customer-notification" aria-label="การแจ้งเตือน" onClick={() => notify('มีการอัปเดต Booking 1 รายการ')}><Bell size={18} /></button></div>
     </header>
-    <main className="customer-main"><div className="customer-page-label"><span>พอร์ทัลลูกค้า</span><b>/</b><strong>{title}</strong></div>{view === 'new-booking' && <CustomerNewBooking notify={notify} onNavigate={onNavigate} />}{view === 'bookings' && <CustomerBookings bookings={bookings} onNavigate={onNavigate} />}{view === 'company' && <CustomerCompany notify={notify} />}</main>
+    <main className="customer-main"><div className="customer-page-label"><span>พอร์ทัลลูกค้า</span><b>/</b><strong>{title}</strong></div>{view === 'new-booking' && <CustomerNewBooking notify={notify} onNavigate={onNavigate} onBookingCreated={onBookingCreated} />}{view === 'bookings' && <CustomerBookings bookings={bookings} onNavigate={onNavigate} />}{view === 'company' && <CustomerCompany notify={notify} />}</main>
   </div>;
 }
 
-function CustomerNewBooking({ notify, onNavigate }: { notify: (message: string) => void; onNavigate: (view: CustomerView) => void }) {
+function CustomerNewBooking({ notify, onNavigate, onBookingCreated }: { notify: (message: string) => void; onNavigate: (view: CustomerView) => void; onBookingCreated: (booking: Booking) => void }) {
   const [service, setService] = useState('ดูดบ่อดักไขมัน');
-  const [selectedDate, setSelectedDate] = useState('2026-09-01');
+  const [selectedDate, setSelectedDate] = useState(tomorrowIso);
   const [selectedSlot, setSelectedSlot] = useState('09:00–11:30');
-  const [calendarMonth, setCalendarMonth] = useState({ year: 2026, month: 8 });
+  const tomorrowDate = new Date(`${tomorrowIso}T00:00:00`);
+  const [calendarMonth, setCalendarMonth] = useState({ year: tomorrowDate.getFullYear(), month: tomorrowDate.getMonth() });
   const [availability, setAvailability] = useState<ApiAvailabilityResponse | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [successOpen, setSuccessOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [siteId, setSiteId] = useState('00000000-0000-4000-8000-000000000010');
+  const [siteName, setSiteName] = useState('โรงงาน ไทยรุ่ง — บางปะกง, ฉะเชิงเทรา');
+  const [sites, setSites] = useState<Array<{ id: string; name: string; district?: string | null; province?: string | null }>>([]);
+  const [volume, setVolume] = useState('');
+  const [volumeUnit, setVolumeUnit] = useState('ลบ.ม.');
+  const [customerNote, setCustomerNote] = useState('');
+  const [createdNumber, setCreatedNumber] = useState('');
   const services = [{ name: 'ดูดบ่อดักไขมัน', detail: 'รถดูดสูญญากาศ', icon: '≋', tone: 'teal' }, { name: 'ขนส่งกากอุตสาหกรรม', detail: 'รถขนกากมาตรฐาน', icon: '▱', tone: 'amber' }, { name: 'ล้างบ่อบำบัดน้ำเสีย', detail: 'รถดูดตะกอน', icon: '✧', tone: 'violet' }];
-  const days = useMemo(() => [{ date: '2026-08-31', label: 'จ. 31', state: 'เหลือ 1 ช่วง', tone: 'limited' }, { date: '2026-09-01', label: 'อ. 1', state: 'ว่าง 3 ช่วง', tone: 'open' }, { date: '2026-09-02', label: 'พ. 2', state: 'ว่าง 2 ช่วง', tone: 'open' }, { date: '2026-09-03', label: 'พฤ. 3', state: 'เต็ม', tone: 'closed' }, { date: '2026-09-04', label: 'ศ. 4', state: 'ว่าง 3 ช่วง', tone: 'open' }], []);
   const monthLabel = useMemo(() => new Intl.DateTimeFormat('th-TH', { month: 'long', year: 'numeric' }).format(new Date(calendarMonth.year, calendarMonth.month, 1)), [calendarMonth]);
   const calendarCells = useMemo(() => {
     const firstWeekday = new Date(calendarMonth.year, calendarMonth.month, 1).getDay();
@@ -497,12 +629,15 @@ function CustomerNewBooking({ notify, onNavigate }: { notify: (message: string) 
       if (index < firstWeekday) return { key: `empty-${index}`, date: '', day: '', tone: 'empty', state: '', isCurrentMonth: false };
       const day = index - firstWeekday + 1;
       const date = `${calendarMonth.year}-${String(calendarMonth.month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-      const known = days.find((item) => item.date === date);
       const weekday = new Date(calendarMonth.year, calendarMonth.month, day).getDay();
-      const tone = known?.tone ?? (weekday === 0 ? 'closed' : 'open');
-      return { key: date, date, day: String(day), tone, state: known?.state ?? (tone === 'closed' ? 'ปิดบริการ' : 'ว่าง 3 ช่วง'), isCurrentMonth: true };
+      const isPast = date < todayIso;
+      const selectedAvailability = date === selectedDate ? availability : null;
+      const availableSlots = selectedAvailability?.slots.filter((slot) => slot.available).length;
+      const tone = isPast || weekday === 0 ? 'closed' : selectedAvailability && availableSlots === 0 ? 'closed' : selectedAvailability && availableSlots === 1 ? 'limited' : 'open';
+      const state = isPast ? 'ผ่านไปแล้ว' : weekday === 0 ? 'ปิดบริการ' : selectedAvailability ? availableSlots ? `ว่าง ${availableSlots} ช่วง` : 'เต็ม' : 'ตรวจสอบคิว';
+      return { key: date, date, day: String(day), tone, state, isCurrentMonth: true };
     });
-  }, [calendarMonth, days]);
+  }, [calendarMonth, selectedDate, availability]);
   const changeMonth = (offset: number) => {
     const next = new Date(calendarMonth.year, calendarMonth.month + offset, 1);
     const date = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-01`;
@@ -515,22 +650,35 @@ function CustomerNewBooking({ notify, onNavigate }: { notify: (message: string) 
   const fallbackSlots = useMemo(() => selectedDate === '2026-08-31' ? ['13:00–15:30'] : selectedDate === '2026-09-03' ? [] : ['09:00–11:30', '13:00–15:30', '15:30–18:00'], [selectedDate]);
   const formatSlotClock = (value: string) => new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(value));
   const liveSlots = availability?.slots.map((slot) => ({ label: `${formatSlotClock(slot.start)}–${formatSlotClock(slot.end)}`, available: slot.available, remaining: slot.remaining })) ?? [];
-  const slots = liveSlots.length ? liveSlots : fallbackSlots.map((label) => ({ label, available: true, remaining: selectedDate === '2026-08-31' ? 1 : 3 }));
+  const slots = availability ? liveSlots : isApiEnabled() ? [] : fallbackSlots.map((label) => ({ label, available: true, remaining: selectedDate === '2026-08-31' ? 1 : 3 }));
+
+  useEffect(() => {
+    if (!isApiEnabled()) return undefined;
+    fetchCustomerSites().then((result) => {
+      setSites(result.items);
+      const first = result.items[0];
+      if (first) {
+        setSiteId(first.id);
+        setSiteName(`${first.name} — ${[first.district, first.province].filter(Boolean).join(', ')}`);
+      }
+    }).catch(() => undefined);
+    return undefined;
+  }, []);
 
   useEffect(() => {
     if (!isApiEnabled()) return undefined;
     let active = true;
-    fetchCustomerAvailability(serviceCode, selectedDate, '00000000-0000-4000-8000-000000000010').then((result) => {
+    fetchCustomerAvailability(serviceCode, selectedDate, siteId).then((result) => {
       if (!active) return;
       setAvailability(result);
       const firstAvailable = result.slots.find((slot) => slot.available);
       setSelectedSlot(firstAvailable ? `${formatSlotClock(firstAvailable.start)}–${formatSlotClock(firstAvailable.end)}` : '');
     }).catch(() => { if (active) setAvailability(null); });
     return () => { active = false; };
-  }, [fallbackSlots, selectedDate, serviceCode]);
+  }, [fallbackSlots, selectedDate, serviceCode, siteId]);
 
   const requestSubmit = () => {
-    if (!selectedSlot) {
+    if (!selectedSlot || (isApiEnabled() && !availability)) {
       notify('กรุณาเลือกวันและเวลาที่ว่างก่อนส่งคำขอ');
       return;
     }
@@ -538,21 +686,30 @@ function CustomerNewBooking({ notify, onNavigate }: { notify: (message: string) 
   };
   const submit = async () => {
     setSubmitting(true);
+    const [requestedStart, requestedEnd] = selectedSlot.split('–').map((part) => part.trim());
+    let created: Booking | null = null;
     if (isApiEnabled()) {
       try {
-        await submitCustomerBooking({ serviceCode, customerSiteId: '00000000-0000-4000-8000-000000000010', requestedDate: selectedDate, requestedStart: selectedSlot.slice(0, 5), requestedEnd: selectedSlot.slice(6), estimatedVolume: undefined });
-      } catch {
+        const result = await submitCustomerBooking({ serviceCode, customerSiteId: siteId, requestedDate: selectedDate, requestedStart, requestedEnd, estimatedVolume: volume ? Number(volume) : undefined, volumeUnit, customerNote: customerNote || undefined });
+        created = toUiBooking(result);
+        setCreatedNumber(result.bookingNumber);
+      } catch (error) {
         setSubmitting(false);
-        notify('ยังส่งคำขอไม่ได้ กรุณาลองใหม่หรือติดต่อทีม Foresee');
+        notify(error instanceof Error ? error.message : 'ยังส่งคำขอไม่ได้ กรุณาลองใหม่');
         return;
       }
+    } else {
+      const number = `BK-${selectedDate.replaceAll('-', '')}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+      created = { id: number, customer: 'บริษัท ไทยรุ่งอุตสาหกรรม', service, site: siteName, date: selectedDate, start: requestedStart, end: requestedEnd, vehicle: 'ยังไม่จัดรถ', driver: 'ยังไม่จัดทีม', status: 'รอยืนยัน', stage: 'รอเริ่มงาน', sla: 'ปกติ', customerNote };
+      setCreatedNumber(number);
     }
+    if (created) onBookingCreated(created);
     setSubmitting(false);
     setConfirmOpen(false);
     setSubmitted(true);
     setSuccessOpen(true);
   };
-  if (submitted) return <><section className="customer-confirmation"><div className="submitted-icon"><Check size={30} /></div><span className="customer-eyebrow">คำขอของคุณถูกส่งแล้ว</span><h1>ขอบคุณที่ไว้วางใจ Foresee</h1><p>หมายเลขคำขอ <b>BK-260901-024</b><br />ทีมงานกำลังตรวจสอบรถและจะติดต่อกลับเพื่อยืนยันภายใน 15 นาที</p><div><button className="primary-button" onClick={() => onNavigate('bookings')}>ดูการจองของฉัน <ArrowRight size={16} /></button><button className="secondary-button" onClick={() => setSubmitted(false)}>สร้างการจองอีกครั้ง</button></div></section>{successOpen && <FeedbackModal variant="success" title="ส่งคำขอจองสำเร็จ" copy="เราได้รับคำขอแล้ว ทีม Foresee จะตรวจสอบรถและติดต่อกลับภายใน 15 นาที" confirmLabel="ดูรายละเอียดการจอง" onConfirm={() => { setSuccessOpen(false); onNavigate('bookings'); }} onClose={() => setSuccessOpen(false)} />}</>;
+  if (submitted) return <><section className="customer-confirmation"><div className="submitted-icon"><Check size={30} /></div><span className="customer-eyebrow">คำขอของคุณถูกส่งแล้ว</span><h1>ขอบคุณที่ไว้วางใจ Foresee</h1><p>หมายเลขคำขอ <b>{createdNumber}</b><br />ทีมงานกำลังตรวจสอบรถและจะติดต่อกลับเพื่อยืนยันภายใน 15 นาที</p><div><button className="primary-button" onClick={() => onNavigate('bookings')}>ดูการจองของฉัน <ArrowRight size={16} /></button><button className="secondary-button" onClick={() => { setSubmitted(false); setCreatedNumber(''); }}>สร้างการจองอีกครั้ง</button></div></section>{successOpen && <FeedbackModal variant="success" title="ส่งคำขอจองสำเร็จ" copy="เราได้รับคำขอแล้ว ทีม Foresee จะตรวจสอบรถและติดต่อกลับภายใน 15 นาที" confirmLabel="ดูรายละเอียดการจอง" onConfirm={() => { setSuccessOpen(false); onNavigate('bookings'); }} onClose={() => setSuccessOpen(false)} />}</>;
 
   return <>
     <section className="customer-hero"><div className="customer-hero-copy"><span className="customer-eyebrow">บริการสำหรับธุรกิจของคุณ</span><h1>จองรถบริการให้ตรงกับวันที่คุณสะดวก</h1><p>เลือกบริการ วัน และเวลาที่ว่างได้ด้วยตัวเอง ทีม Foresee พร้อมดูแลตั้งแต่ต้นจนจบ</p><div className="customer-trust-list"><span><Check size={15} /> เห็นคิวว่างแบบเรียลไทม์</span><span><Check size={15} /> ยืนยันคิวภายใน 15 นาที</span><span><Check size={15} /> มีทีมงานคอยดูแล</span></div></div><div className="customer-hero-art"><span className="hero-art-circle circle-one" /><span className="hero-art-circle circle-two" /><Truck size={92} strokeWidth={1.2} /><small>FORESEE ON THE WAY</small></div></section>
@@ -560,18 +717,22 @@ function CustomerNewBooking({ notify, onNavigate }: { notify: (message: string) 
       <section className="booking-form-panel customer-booking-main">
         <div className="customer-stepper"><span className="active"><b>1</b> บริการ</span><i /><span className="active"><b>2</b> วันและเวลา</span><i /><span><b>3</b> ยืนยัน</span></div>
         <section className="customer-section"><div className="customer-section-heading"><div><span className="customer-eyebrow">ขั้นตอนที่ 1</span><h2>เลือกบริการที่ต้องการ</h2><p>บริการที่เหมาะกับสถานประกอบการของคุณ</p></div><span className="required-note">* จำเป็น</span></div><div className="service-cards customer-service-cards">{services.map((item) => <button key={item.name} className={service === item.name ? `service-card customer-service-card selected ${item.tone}` : 'service-card customer-service-card'} onClick={() => { setService(item.name); setAvailability(null); }}><span className={`service-icon ${item.tone}`}>{item.icon}</span><span><b>{item.name}</b><small>{item.detail}</small><em>ดูรายละเอียดบริการ <ArrowRight size={12} /></em></span>{service === item.name && <Check size={18} />}</button>)}</div></section>
-        <section className="customer-section customer-calendar-card"><div className="customer-section-heading"><div><span className="customer-eyebrow">ขั้นตอนที่ 2</span><h2>เลือกวันและเวลาที่สะดวก</h2><p>ดูภาพรวมทั้งเดือน แล้วเลือกวันที่มีคิวว่างได้ทันที</p></div><span className="required-note">* จำเป็น</span></div><div className="booking-month customer-calendar-toolbar"><button className="calendar-arrow" aria-label="เดือนก่อนหน้า" onClick={() => changeMonth(-1)}><ArrowLeft size={17} /></button><div><b>{monthLabel}</b><small>เลือกวันที่มีป้าย “ว่าง”</small></div><button className="calendar-arrow" aria-label="เดือนถัดไป" onClick={() => changeMonth(1)}><ArrowRight size={17} /></button></div><div className="availability-legend"><span><i className="legend-dot open" /> ว่าง</span><span><i className="legend-dot limited" /> เหลือคิวน้อย</span><span><i className="legend-dot closed" /> เต็ม / ปิด</span></div><div className="customer-month-calendar"><div className="customer-calendar-weekdays">{['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'].map((weekday) => <span key={weekday}>{weekday}</span>)}</div><div className="customer-month-grid">{calendarCells.map((day) => <button key={day.key} disabled={!day.isCurrentMonth || day.tone === 'closed'} aria-label={day.isCurrentMonth ? `${day.day} ${day.state}` : undefined} className={`customer-month-cell ${day.tone} ${selectedDate === day.date ? 'selected' : ''}`} onClick={() => { setSelectedDate(day.date); setAvailability(null); setSelectedSlot(day.tone === 'limited' ? '13:00–15:30' : '09:00–11:30'); }}><span>{day.day}</span>{day.isCurrentMonth && <small>{day.state}</small>}</button>)}</div></div><div className="slot-area customer-slot-area"><div className="slot-heading"><div><span>ช่วงเวลาที่ว่าง · {formatThaiDate(selectedDate)}</span><small>{availability ? `รถพร้อมให้เลือก ${availability.capacity} คัน` : 'เลือกช่วงเวลาที่เหมาะกับคุณ'}</small></div><Clock3 size={21} /></div><div className="customer-time-grid">{slots.length ? slots.map((slot) => <button key={slot.label} disabled={!slot.available} className={selectedSlot === slot.label ? 'slot customer-time-slot selected' : 'slot customer-time-slot'} onClick={() => setSelectedSlot(slot.label)}><span><Clock3 size={17} /><b>{slot.label}</b></span><small>{slot.available ? `เหลือ ${slot.remaining} คัน` : 'เต็มแล้ว'}</small></button>) : <div className="empty-slot">วันนี้เต็มแล้ว ลองเลือกวันที่ใกล้เคียง</div>}</div></div></section>
-        <section className="customer-section"><div className="customer-section-heading"><div><span className="customer-eyebrow">ขั้นตอนที่ 3</span><h2>บอกเราเกี่ยวกับสถานที่</h2><p>ข้อมูลนี้ช่วยให้ทีมเตรียมเส้นทางได้แม่นยำขึ้น</p></div><span className="required-note">* จำเป็น</span></div><label className="field-label customer-field-label">สถานที่ / ชื่อโรงงาน<div className="field-control"><MapPin size={17} /><input defaultValue="โรงงาน ไทยรุ่ง — บางปะกง, ฉะเชิงเทรา" /></div></label><label className="field-label customer-field-label">ปริมาณโดยประมาณ <span>(ถ้ามี)</span><div className="inline-fields"><input placeholder="เช่น 8" /><select defaultValue="ลบ.ม."><option>ลบ.ม.</option><option>ตัน</option><option>เที่ยว</option></select></div></label><label className="field-label customer-field-label">หมายเหตุเพิ่มเติม <span>(ถ้ามี)</span><textarea rows={3} placeholder="เช่น ต้องเข้าทางประตู 2, ติดต่อคุณ..." /></label></section>
+        <section className="customer-section customer-calendar-card"><div className="customer-section-heading"><div><span className="customer-eyebrow">ขั้นตอนที่ 2</span><h2>เลือกวันและเวลาที่สะดวก</h2><p>ดูภาพรวมทั้งเดือน แล้วเลือกวันที่มีคิวว่างได้ทันที</p></div><span className="required-note">* จำเป็น</span></div><div className="booking-month customer-calendar-toolbar"><button className="calendar-arrow" aria-label="เดือนก่อนหน้า" onClick={() => changeMonth(-1)}><ArrowLeft size={17} /></button><div><b>{monthLabel}</b><small>เลือกวันที่มีป้าย “ว่าง”</small></div><button className="calendar-arrow" aria-label="เดือนถัดไป" onClick={() => changeMonth(1)}><ArrowRight size={17} /></button></div><div className="availability-legend"><span><i className="legend-dot open" /> ว่าง</span><span><i className="legend-dot limited" /> เหลือคิวน้อย</span><span><i className="legend-dot closed" /> เต็ม / ปิด</span></div><div className="customer-month-calendar"><div className="customer-calendar-weekdays">{['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'].map((weekday) => <span key={weekday}>{weekday}</span>)}</div><div className="customer-month-grid">{calendarCells.map((day) => <button key={day.key} disabled={!day.isCurrentMonth || day.tone === 'closed'} aria-label={day.isCurrentMonth ? `${day.day} ${day.state}` : undefined} className={`customer-month-cell ${day.tone} ${selectedDate === day.date ? 'selected' : ''}`} onClick={() => { setSelectedDate(day.date); setAvailability(null); setSelectedSlot(day.tone === 'limited' ? '13:00–15:30' : '09:00–11:30'); }}><span>{day.day}</span>{day.isCurrentMonth && <small>{day.state}</small>}</button>)}</div></div><div className="slot-area customer-slot-area"><div className="slot-heading"><div><span>ช่วงเวลาที่ว่าง · {formatThaiDate(selectedDate)}</span><small>{availability ? `รถพร้อมให้เลือก ${availability.capacity} คัน` : 'เลือกช่วงเวลาที่เหมาะกับคุณ'}</small></div><Clock3 size={21} /></div>{slots.length ? <label className="customer-time-select-wrap"><Clock3 size={21} aria-hidden="true" /><select className="customer-time-select" aria-label="เลือกช่วงเวลา" value={selectedSlot} onChange={(event) => setSelectedSlot(event.target.value)}>{slots.map((slot) => <option key={slot.label} value={slot.label} disabled={!slot.available}>{slot.label} · {slot.available ? `เหลือ ${slot.remaining} คัน` : 'เต็มแล้ว'}</option>)}</select><ChevronDown size={17} aria-hidden="true" /></label> : <div className="empty-slot">วันนี้เต็มแล้ว ลองเลือกวันที่ใกล้เคียง</div>}</div></section>
+        <section className="customer-section"><div className="customer-section-heading"><div><span className="customer-eyebrow">ขั้นตอนที่ 3</span><h2>บอกเราเกี่ยวกับสถานที่</h2><p>ข้อมูลนี้ช่วยให้ทีมเตรียมเส้นทางได้แม่นยำขึ้น</p></div><span className="required-note">* จำเป็น</span></div><label className="field-label customer-field-label">สถานที่ / ชื่อโรงงาน<div className="field-control"><MapPin size={17} />{sites.length ? <select value={siteId} onChange={(event) => { const next = sites.find((item) => item.id === event.target.value); setSiteId(event.target.value); if (next) setSiteName(`${next.name} — ${[next.district, next.province].filter(Boolean).join(', ')}`); }} aria-label="สถานที่ / ชื่อโรงงาน">{sites.map((item) => <option key={item.id} value={item.id}>{item.name} · {[item.district, item.province].filter(Boolean).join(', ')}</option>)}</select> : <input value={siteName} onChange={(event) => setSiteName(event.target.value)} readOnly={isApiEnabled()} />}</div></label><label className="field-label customer-field-label">ปริมาณโดยประมาณ <span>(ถ้ามี)</span><div className="inline-fields"><input value={volume} onChange={(event) => setVolume(event.target.value.replace(/[^0-9.]/g, ''))} placeholder="เช่น 8" inputMode="decimal" /><select value={volumeUnit} onChange={(event) => setVolumeUnit(event.target.value)}><option>ลบ.ม.</option><option>ตัน</option><option>เที่ยว</option></select></div></label><label className="field-label customer-field-label">หมายเหตุเพิ่มเติม <span>(ถ้ามี)</span><textarea value={customerNote} onChange={(event) => setCustomerNote(event.target.value)} rows={3} placeholder="เช่น ต้องเข้าทางประตู 2, ติดต่อคุณ..." /></label></section>
       </section>
-      <aside className="customer-summary"><section className="summary-card customer-summary-card"><span className="summary-kicker">สรุปการจอง</span><h2>พร้อมให้เราเข้าดูแล</h2><div className="summary-service"><span className="service-icon teal">≋</span><div><small>บริการที่เลือก</small><b>{service}</b></div></div><div className="summary-details"><div><span>วันเวลา</span><b>{formatThaiDate(selectedDate)}<br />{selectedSlot || 'ยังไม่ได้เลือก'}</b></div><div><span>สถานที่</span><b>โรงงาน ไทยรุ่ง<br />บางปะกง, ฉะเชิงเทรา</b></div></div><div className="summary-note"><ShieldCheck size={17} /><p>เราจะยืนยันรถและเวลาที่เหมาะสมให้ภายใน 15 นาที</p></div><button className="primary-button full-button customer-submit-button" onClick={requestSubmit}><span>ส่งคำขอจอง</span><ArrowRight size={18} /></button><small className="summary-footnote">ไม่มีค่าใช้จ่ายจนกว่าจะยืนยันงาน</small></section><section className="recent-card customer-recent-card"><div className="panel-head"><div><h3>การจองล่าสุด</h3><p>รายการที่กำลังดำเนินการ</p></div><em className="status-chip status-pending">รอยืนยัน</em></div><div className="recent-booking"><b>27</b><span>ส.ค.</span><div><strong>ขนส่งกากอุตสาหกรรม</strong><small>13:00–15:30 · BK-260827-016</small></div></div><button className="quiet-button" onClick={() => onNavigate('bookings')}>ดูการจองของฉัน <ArrowRight size={15} /></button></section></aside>
+      <aside className="customer-summary"><section className="summary-card customer-summary-card"><span className="summary-kicker">สรุปการจอง</span><h2>พร้อมให้เราเข้าดูแล</h2><div className="summary-service"><span className="service-icon teal">≋</span><div><small>บริการที่เลือก</small><b>{service}</b></div></div><div className="summary-details"><div><span>วันเวลา</span><b>{formatThaiDate(selectedDate)}<br />{selectedSlot || 'ยังไม่ได้เลือก'}</b></div><div><span>สถานที่</span><b>{siteName || 'ยังไม่ได้เลือก'}</b></div></div><div className="summary-note"><ShieldCheck size={17} /><p>เราจะยืนยันรถและเวลาที่เหมาะสมให้ภายใน 15 นาที</p></div><button className="primary-button full-button customer-submit-button" onClick={requestSubmit}><span>ส่งคำขอจอง</span><ArrowRight size={18} /></button><small className="summary-footnote">ไม่มีค่าใช้จ่ายจนกว่าจะยืนยันงาน</small></section><section className="recent-card customer-recent-card"><div className="panel-head"><div><h3>การจองล่าสุด</h3><p>รายการที่กำลังดำเนินการ</p></div><em className="status-chip status-pending">{createdNumber ? 'รอยืนยัน' : 'พร้อมจอง'}</em></div><div className="recent-booking"><b>{createdNumber ? 'ใหม่' : '—'}</b><span>{createdNumber ? 'วันนี้' : ''}</span><div><strong>{createdNumber ? 'สร้างรายการล่าสุดแล้ว' : 'ยังไม่มีการจองใหม่'}</strong><small>{createdNumber || 'เลือกวันเวลาเพื่อเริ่มต้น'}</small></div></div><button className="quiet-button" onClick={() => onNavigate('bookings')}>ดูการจองของฉัน <ArrowRight size={15} /></button></section></aside>
     </div>
     {confirmOpen && <FeedbackModal variant="confirm" title="ยืนยันการจองนี้ไหม?" copy={`ขอจอง${service} วันที่ ${formatThaiDate(selectedDate)} เวลา ${selectedSlot}`} confirmLabel={submitting ? 'กำลังส่งคำขอ…' : 'ยืนยันและส่งคำขอ'} onConfirm={submit} onClose={() => { if (!submitting) setConfirmOpen(false); }} busy={submitting} />}
   </>;
 }
 
 function CustomerBookings({ bookings, onNavigate }: { bookings: Booking[]; onNavigate: (view: CustomerView) => void }) {
-  const customerBookings = bookings.slice(0, 3);
-  return <><PageHeader eyebrow="พอร์ทัลลูกค้า · ไทยรุ่งอุตสาหกรรม" title="การจองของฉัน" copy="ติดตาม Booking ปัจจุบันและประวัติการให้บริการ" action={<button className="primary-button" onClick={() => onNavigate('new-booking')}><Plus size={17} /> จองบริการใหม่</button>} /><div className="customer-status-tabs"><button className="selected">กำลังดำเนินการ <em>2</em></button><button>เสร็จสิ้น <em>1</em></button></div><section className="customer-booking-list">{customerBookings.map((booking) => <article className="panel customer-booking-card" key={booking.id}><div className="customer-booking-top"><div><span>{booking.id}</span><h2>{booking.service}</h2><p><MapPin size={13} /> {booking.site}</p></div><em className={`status-chip ${statusClass[booking.status]}`}>{booking.status}</em></div><div className="customer-booking-meta"><span><CalendarDays size={14} /> {formatThaiDate(booking.date)}</span><span><Clock3 size={14} /> {booking.start}–{booking.end}</span><span><Truck size={14} /> {booking.vehicle}</span></div><div className="customer-progress"><div className="progress-label"><span>สถานะงาน</span><b>{booking.stage}</b></div><div className="progress-line"><i className={booking.stage === 'เสร็จสิ้น' ? 'complete' : 'active'} style={{ width: booking.stage === 'เสร็จสิ้น' ? '100%' : booking.stage === 'กำลังให้บริการ' ? '75%' : '38%' }} /></div></div><button className="quiet-button">ดูรายละเอียด <ArrowRight size={15} /></button></article>)}</section></>;
+  const [tab, setTab] = useState<'active' | 'complete'>('active');
+  const customerBookings = bookings.filter((item) => item.customer.includes('ไทยรุ่ง'));
+  const activeBookings = customerBookings.filter((item) => item.stage !== 'เสร็จสิ้น');
+  const completeBookings = customerBookings.filter((item) => item.stage === 'เสร็จสิ้น');
+  const visibleBookings = tab === 'active' ? activeBookings : completeBookings;
+  return <><PageHeader eyebrow="พอร์ทัลลูกค้า · ไทยรุ่งอุตสาหกรรม" title="การจองของฉัน" copy="ติดตาม Booking ปัจจุบันและประวัติการให้บริการ" action={<button className="primary-button" onClick={() => onNavigate('new-booking')}><Plus size={17} /> จองบริการใหม่</button>} /><div className="customer-status-tabs"><button className={tab === 'active' ? 'selected' : ''} onClick={() => setTab('active')}>กำลังดำเนินการ <em>{activeBookings.length}</em></button><button className={tab === 'complete' ? 'selected' : ''} onClick={() => setTab('complete')}>เสร็จสิ้น <em>{completeBookings.length}</em></button></div><section className="customer-booking-list">{visibleBookings.length ? visibleBookings.map((booking) => <article className="panel customer-booking-card" key={booking.id}><div className="customer-booking-top"><div><span>{booking.id}</span><h2>{booking.service}</h2><p><MapPin size={13} /> {booking.site}</p></div><em className={`status-chip ${statusClass[booking.status]}`}>{booking.status}</em></div><div className="customer-booking-meta"><span><CalendarDays size={14} /> {formatThaiDate(booking.date)}</span><span><Clock3 size={14} /> {booking.start}–{booking.end}</span><span><Truck size={14} /> {booking.vehicle}</span></div><div className="customer-progress"><div className="progress-label"><span>สถานะงาน</span><b>{booking.stage}</b></div><div className="progress-line"><i className={booking.stage === 'เสร็จสิ้น' ? 'complete' : 'active'} style={{ width: booking.stage === 'เสร็จสิ้น' ? '100%' : booking.stage === 'กำลังให้บริการ' ? '75%' : '38%' }} /></div></div><button className="quiet-button" onClick={() => onNavigate('new-booking')}>จองบริการอีกครั้ง <ArrowRight size={15} /></button></article>) : <div className="panel empty-state">ยังไม่มีรายการในหมวดนี้</div>}</section></>;
 }
 
 function CustomerCompany({ notify }: { notify: (message: string) => void }) { return <><PageHeader eyebrow="พอร์ทัลลูกค้า · การตั้งค่า" title="ข้อมูลบริษัท" copy="ข้อมูลนี้ใช้สำหรับการจองและเตรียมเส้นทางเข้าบริการ" /><section className="panel company-profile"><div className="profile-heading"><div className="company-badge">TR</div><div><h2>บริษัท ไทยรุ่งอุตสาหกรรม</h2><p>Customer organization · สมาชิก 3 คน</p></div><button className="secondary-button" onClick={() => notify('เปิดโหมดแก้ไขข้อมูลบริษัท')}>แก้ไขข้อมูล</button></div><div className="profile-fields"><div><span>เลขประจำตัวผู้เสียภาษี</span><b>0105560123456</b></div><div><span>ผู้ประสานงานหลัก</span><b>ธนกร รุ่งเรือง · 08x-xxx-xxxx</b></div><div><span>สถานที่เข้าบริการหลัก</span><b>โรงงาน ไทยรุ่ง — บางปะกง, ฉะเชิงเทรา</b></div><div><span>อีเมลแจ้งเตือน</span><b>contact@thairung.example</b></div></div></section></>; }

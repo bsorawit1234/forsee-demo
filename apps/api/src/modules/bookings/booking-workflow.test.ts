@@ -8,8 +8,8 @@ describe('booking workflow', () => {
     expect(getNextJobStage('COMPLETED')).toBe('COMPLETED');
   });
 
-  it('confirms a pending booking when work starts', () => {
-    expect(statusForStage('PENDING_CONFIRMATION', 'EN_ROUTE')).toBe('CONFIRMED');
+  it('does not confirm a pending booking when a stage is evaluated', () => {
+    expect(statusForStage('PENDING_CONFIRMATION', 'EN_ROUTE')).toBe('PENDING_CONFIRMATION');
     expect(statusForStage('CONFIRMED', 'EN_ROUTE')).toBe('CONFIRMED');
   });
 });

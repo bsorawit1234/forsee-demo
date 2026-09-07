@@ -4,6 +4,7 @@ import { Subject } from 'rxjs';
 export type OperationsEvent = {
   type: string;
   bookingId?: string;
+  customerOrganizationId?: string;
   payload?: Record<string, unknown>;
 };
 

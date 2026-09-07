@@ -1,6 +1,7 @@
-import { Controller, Sse, UseGuards } from '@nestjs/common';
+import { Controller, Req, Sse, UseGuards } from '@nestjs/common';
 import { ApiCookieAuth, ApiTags } from '@nestjs/swagger';
-import { map } from 'rxjs/operators';
+import { filter, map } from 'rxjs/operators';
+import type { AuthenticatedRequest } from '../../common/request-user.js';
 import { EventBus } from './event-bus.js';
 import { SessionGuard } from '../auth/session.guard.js';
 
@@ -12,7 +13,10 @@ export class EventsController {
   @Sse('events')
   @ApiCookieAuth('session')
   @UseGuards(SessionGuard)
-  events() {
-    return this.bus.events.pipe(map((event) => ({ type: event.type, data: JSON.stringify(event) })));
+  events(@Req() request: AuthenticatedRequest) {
+    return this.bus.events.pipe(
+      filter((event) => request.user.organizationType !== 'CUSTOMER' || event.customerOrganizationId === request.user.organizationId),
+      map((event) => ({ type: event.type, data: JSON.stringify(event) })),
+    );
   }
 }

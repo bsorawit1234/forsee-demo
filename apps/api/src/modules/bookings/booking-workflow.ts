@@ -13,6 +13,9 @@ export function getNextJobStage(stage: JobStageValue) {
 }
 
 export function statusForStage(currentStatus: BookingStatus, stage: JobStageValue): BookingStatus {
-  return currentStatus === 'PENDING_CONFIRMATION' && stage !== 'SCHEDULED' ? 'CONFIRMED' : currentStatus;
+  // Booking confirmation is an operations action. Advancing a field stage must
+  // never silently change the booking's approval state.
+  void stage;
+  return currentStatus;
 }
 import type { BookingStatus } from '@prisma/client';
