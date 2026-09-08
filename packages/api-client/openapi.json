@@ -244,6 +244,91 @@
         "tags": [
           "bookings"
         ]
+      },
+      "post": {
+        "operationId": "BookingController_opsCreate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOpsBookingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "bookings"
+        ]
+      }
+    },
+    "/api/v1/ops/bookings/{id}/timeline": {
+      "get": {
+        "operationId": "BookingController_opsTimeline",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "bookings"
+        ]
+      }
+    },
+    "/api/v1/ops/bookings/{id}/revisions": {
+      "get": {
+        "operationId": "BookingController_opsRevisions",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "bookings"
+        ]
       }
     },
     "/api/v1/ops/bookings/{id}": {
@@ -262,6 +347,121 @@
         ],
         "responses": {
           "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "bookings"
+        ]
+      },
+      "patch": {
+        "operationId": "BookingController_opsUpdate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateBookingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "bookings"
+        ]
+      }
+    },
+    "/api/v1/ops/bookings/{id}/cancel": {
+      "post": {
+        "operationId": "BookingController_opsCancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BookingActionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "bookings"
+        ]
+      }
+    },
+    "/api/v1/ops/bookings/{id}/reject": {
+      "post": {
+        "operationId": "BookingController_opsReject",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BookingActionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
             "description": ""
           }
         },
@@ -486,6 +686,54 @@
         ]
       }
     },
+    "/api/v1/ops/customers/{id}/sites": {
+      "get": {
+        "operationId": "OperationsController_customerSites",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "operations"
+        ]
+      }
+    },
+    "/api/v1/ops/users": {
+      "get": {
+        "operationId": "OperationsController_users",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "operations"
+        ]
+      }
+    },
     "/api/v1/events": {
       "get": {
         "operationId": "EventsController_events",
@@ -502,6 +750,237 @@
         ],
         "tags": [
           "events"
+        ]
+      }
+    },
+    "/api/v1/ops/bookings/{bookingId}/tasks": {
+      "get": {
+        "operationId": "TaskController_list",
+        "parameters": [
+          {
+            "name": "bookingId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "tasks"
+        ]
+      },
+      "post": {
+        "operationId": "TaskController_create",
+        "parameters": [
+          {
+            "name": "bookingId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTaskDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "tasks"
+        ]
+      }
+    },
+    "/api/v1/ops/tasks/{taskId}": {
+      "patch": {
+        "operationId": "TaskController_update",
+        "parameters": [
+          {
+            "name": "taskId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTaskDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "tasks"
+        ]
+      }
+    },
+    "/api/v1/ops/tasks/{taskId}/status": {
+      "post": {
+        "operationId": "TaskController_status",
+        "parameters": [
+          {
+            "name": "taskId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskStatusDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "tasks"
+        ]
+      }
+    },
+    "/api/v1/ops/tasks/{taskId}/comment": {
+      "post": {
+        "operationId": "TaskController_comment",
+        "parameters": [
+          {
+            "name": "taskId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskCommentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "tasks"
+        ]
+      }
+    },
+    "/api/v1/owner/audit": {
+      "get": {
+        "operationId": "AuditController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "audit"
+        ]
+      }
+    },
+    "/api/v1/owner/audit/{id}": {
+      "get": {
+        "operationId": "AuditController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "audit"
         ]
       }
     }
@@ -598,6 +1077,10 @@
             "type": "number",
             "example": 4
           },
+          "volumeUnit": {
+            "type": "string",
+            "example": "ลบ.ม."
+          },
           "customerNote": {
             "type": "string",
             "example": "เข้าทางประตูฝั่งตะวันออก"
@@ -609,6 +1092,164 @@
           "requestedDate",
           "requestedStart",
           "requestedEnd"
+        ]
+      },
+      "CreateOpsBookingDto": {
+        "type": "object",
+        "properties": {
+          "serviceCode": {
+            "type": "string",
+            "example": "GREASE_TRAP"
+          },
+          "customerSiteId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "requestedDate": {
+            "type": "string",
+            "example": "2026-09-01"
+          },
+          "requestedStart": {
+            "type": "string",
+            "example": "09:00"
+          },
+          "requestedEnd": {
+            "type": "string",
+            "example": "11:30"
+          },
+          "estimatedVolume": {
+            "type": "number",
+            "example": 4
+          },
+          "volumeUnit": {
+            "type": "string",
+            "example": "ลบ.ม."
+          },
+          "customerNote": {
+            "type": "string",
+            "example": "เข้าทางประตูฝั่งตะวันออก"
+          },
+          "customerOrganizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "source": {
+            "type": "string",
+            "example": "ADMIN_PHONE",
+            "enum": [
+              "ADMIN_PHONE",
+              "ADMIN_MANUAL"
+            ]
+          },
+          "internalNote": {
+            "type": "string",
+            "example": "ลูกค้าโทรยืนยันกับคุณเอ"
+          },
+          "responsibleUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "contactName": {
+            "type": "string",
+            "example": "คุณเอ"
+          },
+          "contactPhone": {
+            "type": "string",
+            "example": "0812345678"
+          },
+          "confirmImmediately": {
+            "type": "boolean",
+            "example": false
+          }
+        },
+        "required": [
+          "serviceCode",
+          "customerSiteId",
+          "requestedDate",
+          "requestedStart",
+          "requestedEnd",
+          "customerOrganizationId"
+        ]
+      },
+      "UpdateBookingDto": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number",
+            "example": 1
+          },
+          "serviceCode": {
+            "type": "string",
+            "example": "GREASE_TRAP"
+          },
+          "customerSiteId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "requestedDate": {
+            "type": "string",
+            "example": "2026-09-10"
+          },
+          "requestedStart": {
+            "type": "string",
+            "example": "10:00"
+          },
+          "requestedEnd": {
+            "type": "string",
+            "example": "12:30"
+          },
+          "estimatedVolume": {
+            "type": "number",
+            "example": 10
+          },
+          "volumeUnit": {
+            "type": "string",
+            "example": "ลบ.ม."
+          },
+          "customerNote": {
+            "type": "string",
+            "example": "เข้าทางประตู 2"
+          },
+          "internalNote": {
+            "type": "string",
+            "example": "โทรยืนยันแล้ว ลูกค้าขอเลื่อนเวลา"
+          },
+          "responsibleUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "changeReason": {
+            "type": "string",
+            "example": "ลูกค้าขอเลื่อนเวลาและเพิ่มปริมาณ"
+          },
+          "assignmentResolution": {
+            "type": "string",
+            "example": "UNASSIGN_IF_INVALID",
+            "enum": [
+              "UNASSIGN_IF_INVALID",
+              "CANCEL_EDIT"
+            ]
+          },
+          "override": {
+            "type": "boolean",
+            "example": false
+          }
+        },
+        "required": [
+          "version",
+          "changeReason"
+        ]
+      },
+      "BookingActionDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "example": "ลูกค้าขอยกเลิกทางโทรศัพท์"
+          }
+        },
+        "required": [
+          "reason"
         ]
       },
       "AssignBookingDto": {
@@ -629,6 +1270,137 @@
         },
         "required": [
           "vehicleId"
+        ]
+      },
+      "CreateTaskDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "example": "โทรยืนยันข้อมูลกับลูกค้า"
+          },
+          "description": {
+            "type": "string",
+            "example": "ยืนยันปริมาณและเวลาเข้าบริการ"
+          },
+          "assigneeUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "LOW",
+              "NORMAL",
+              "HIGH",
+              "URGENT"
+            ],
+            "default": "NORMAL"
+          },
+          "dueAt": {
+            "type": "string",
+            "example": "2026-09-10T10:00:00.000Z"
+          },
+          "isRequired": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": [
+          "title"
+        ]
+      },
+      "UpdateTaskDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "example": "โทรยืนยันข้อมูลกับลูกค้า"
+          },
+          "description": {
+            "type": "string",
+            "example": "ยืนยันปริมาณและเวลาเข้าบริการ"
+          },
+          "assigneeUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "LOW",
+              "NORMAL",
+              "HIGH",
+              "URGENT"
+            ],
+            "default": "NORMAL"
+          },
+          "dueAt": {
+            "type": "string",
+            "example": "2026-09-10T10:00:00.000Z"
+          },
+          "isRequired": {
+            "type": "boolean",
+            "default": false
+          },
+          "version": {
+            "type": "number",
+            "example": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "TODO",
+              "IN_PROGRESS",
+              "WAITING",
+              "BLOCKED",
+              "DONE",
+              "CANCELLED"
+            ]
+          },
+          "changeReason": {
+            "type": "string",
+            "example": "ลูกค้าแจ้งข้อมูลครบแล้ว"
+          }
+        },
+        "required": [
+          "title",
+          "version"
+        ]
+      },
+      "TaskStatusDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "TODO",
+              "IN_PROGRESS",
+              "WAITING",
+              "BLOCKED",
+              "DONE",
+              "CANCELLED"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "example": "รอเอกสารจากลูกค้า"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "TaskCommentDto": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string",
+            "example": "โทรแจ้งลูกค้าแล้ว รอส่งรูปหน้างาน"
+          }
+        },
+        "required": [
+          "note"
         ]
       }
     }

@@ -26,7 +26,10 @@ import type {
 
 import type {
   AssignBookingDto,
-  CreateBookingDto
+  BookingActionDto,
+  CreateBookingDto,
+  CreateOpsBookingDto,
+  UpdateBookingDto
 } from '.././model';
 
 
@@ -452,6 +455,313 @@ export function useBookingControllerOpsList<TData = Awaited<ReturnType<typeof bo
 
 
 
+export type bookingControllerOpsCreateResponse201 = {
+  data: void
+  status: 201
+}
+    
+export type bookingControllerOpsCreateResponseSuccess = (bookingControllerOpsCreateResponse201) & {
+  headers: Headers;
+};
+;
+
+export type bookingControllerOpsCreateResponse = (bookingControllerOpsCreateResponseSuccess)
+
+export const getBookingControllerOpsCreateUrl = () => {
+
+
+  
+
+  return `/api/v1/ops/bookings`
+}
+
+export const bookingControllerOpsCreate = async (createOpsBookingDto: CreateOpsBookingDto, options?: RequestInit): Promise<bookingControllerOpsCreateResponse> => {
+  
+  const res = await fetch(getBookingControllerOpsCreateUrl(),
+  {      
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      createOpsBookingDto,)
+  }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+  
+  const data: bookingControllerOpsCreateResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as bookingControllerOpsCreateResponse
+}
+
+
+
+
+export const getBookingControllerOpsCreateMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bookingControllerOpsCreate>>, TError,{data: CreateOpsBookingDto}, TContext>, fetch?: RequestInit}
+): UseMutationOptions<Awaited<ReturnType<typeof bookingControllerOpsCreate>>, TError,{data: CreateOpsBookingDto}, TContext> => {
+
+const mutationKey = ['bookingControllerOpsCreate'];
+const {mutation: mutationOptions, fetch: fetchOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, fetch: undefined};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof bookingControllerOpsCreate>>, {data: CreateOpsBookingDto}> = (props) => {
+          const {data} = props ?? {};
+
+          return  bookingControllerOpsCreate(data,fetchOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type BookingControllerOpsCreateMutationResult = NonNullable<Awaited<ReturnType<typeof bookingControllerOpsCreate>>>
+    export type BookingControllerOpsCreateMutationBody = CreateOpsBookingDto
+    export type BookingControllerOpsCreateMutationError = unknown
+
+    export const useBookingControllerOpsCreate = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bookingControllerOpsCreate>>, TError,{data: CreateOpsBookingDto}, TContext>, fetch?: RequestInit}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof bookingControllerOpsCreate>>,
+        TError,
+        {data: CreateOpsBookingDto},
+        TContext
+      > => {
+
+      const mutationOptions = getBookingControllerOpsCreateMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    export type bookingControllerOpsTimelineResponse200 = {
+  data: void
+  status: 200
+}
+    
+export type bookingControllerOpsTimelineResponseSuccess = (bookingControllerOpsTimelineResponse200) & {
+  headers: Headers;
+};
+;
+
+export type bookingControllerOpsTimelineResponse = (bookingControllerOpsTimelineResponseSuccess)
+
+export const getBookingControllerOpsTimelineUrl = (id: string,) => {
+
+
+  
+
+  return `/api/v1/ops/bookings/${id}/timeline`
+}
+
+export const bookingControllerOpsTimeline = async (id: string, options?: RequestInit): Promise<bookingControllerOpsTimelineResponse> => {
+  
+  const res = await fetch(getBookingControllerOpsTimelineUrl(id),
+  {      
+    ...options,
+    method: 'GET'
+    
+    
+  }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+  
+  const data: bookingControllerOpsTimelineResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as bookingControllerOpsTimelineResponse
+}
+
+
+
+
+
+export const getBookingControllerOpsTimelineQueryKey = (id?: string,) => {
+    return [
+    `/api/v1/ops/bookings/${id}/timeline`
+    ] as const;
+    }
+
+    
+export const getBookingControllerOpsTimelineQueryOptions = <TData = Awaited<ReturnType<typeof bookingControllerOpsTimeline>>, TError = unknown>(id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof bookingControllerOpsTimeline>>, TError, TData>>, fetch?: RequestInit}
+) => {
+
+const {query: queryOptions, fetch: fetchOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getBookingControllerOpsTimelineQueryKey(id);
+
+  
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof bookingControllerOpsTimeline>>> = ({ signal }) => bookingControllerOpsTimeline(id, { signal, ...fetchOptions });
+
+      
+
+      
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof bookingControllerOpsTimeline>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type BookingControllerOpsTimelineQueryResult = NonNullable<Awaited<ReturnType<typeof bookingControllerOpsTimeline>>>
+export type BookingControllerOpsTimelineQueryError = unknown
+
+
+export function useBookingControllerOpsTimeline<TData = Awaited<ReturnType<typeof bookingControllerOpsTimeline>>, TError = unknown>(
+ id: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof bookingControllerOpsTimeline>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof bookingControllerOpsTimeline>>,
+          TError,
+          Awaited<ReturnType<typeof bookingControllerOpsTimeline>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useBookingControllerOpsTimeline<TData = Awaited<ReturnType<typeof bookingControllerOpsTimeline>>, TError = unknown>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof bookingControllerOpsTimeline>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof bookingControllerOpsTimeline>>,
+          TError,
+          Awaited<ReturnType<typeof bookingControllerOpsTimeline>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useBookingControllerOpsTimeline<TData = Awaited<ReturnType<typeof bookingControllerOpsTimeline>>, TError = unknown>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof bookingControllerOpsTimeline>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useBookingControllerOpsTimeline<TData = Awaited<ReturnType<typeof bookingControllerOpsTimeline>>, TError = unknown>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof bookingControllerOpsTimeline>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getBookingControllerOpsTimelineQueryOptions(id,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+
+export type bookingControllerOpsRevisionsResponse200 = {
+  data: void
+  status: 200
+}
+    
+export type bookingControllerOpsRevisionsResponseSuccess = (bookingControllerOpsRevisionsResponse200) & {
+  headers: Headers;
+};
+;
+
+export type bookingControllerOpsRevisionsResponse = (bookingControllerOpsRevisionsResponseSuccess)
+
+export const getBookingControllerOpsRevisionsUrl = (id: string,) => {
+
+
+  
+
+  return `/api/v1/ops/bookings/${id}/revisions`
+}
+
+export const bookingControllerOpsRevisions = async (id: string, options?: RequestInit): Promise<bookingControllerOpsRevisionsResponse> => {
+  
+  const res = await fetch(getBookingControllerOpsRevisionsUrl(id),
+  {      
+    ...options,
+    method: 'GET'
+    
+    
+  }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+  
+  const data: bookingControllerOpsRevisionsResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as bookingControllerOpsRevisionsResponse
+}
+
+
+
+
+
+export const getBookingControllerOpsRevisionsQueryKey = (id?: string,) => {
+    return [
+    `/api/v1/ops/bookings/${id}/revisions`
+    ] as const;
+    }
+
+    
+export const getBookingControllerOpsRevisionsQueryOptions = <TData = Awaited<ReturnType<typeof bookingControllerOpsRevisions>>, TError = unknown>(id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof bookingControllerOpsRevisions>>, TError, TData>>, fetch?: RequestInit}
+) => {
+
+const {query: queryOptions, fetch: fetchOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getBookingControllerOpsRevisionsQueryKey(id);
+
+  
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof bookingControllerOpsRevisions>>> = ({ signal }) => bookingControllerOpsRevisions(id, { signal, ...fetchOptions });
+
+      
+
+      
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof bookingControllerOpsRevisions>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type BookingControllerOpsRevisionsQueryResult = NonNullable<Awaited<ReturnType<typeof bookingControllerOpsRevisions>>>
+export type BookingControllerOpsRevisionsQueryError = unknown
+
+
+export function useBookingControllerOpsRevisions<TData = Awaited<ReturnType<typeof bookingControllerOpsRevisions>>, TError = unknown>(
+ id: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof bookingControllerOpsRevisions>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof bookingControllerOpsRevisions>>,
+          TError,
+          Awaited<ReturnType<typeof bookingControllerOpsRevisions>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useBookingControllerOpsRevisions<TData = Awaited<ReturnType<typeof bookingControllerOpsRevisions>>, TError = unknown>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof bookingControllerOpsRevisions>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof bookingControllerOpsRevisions>>,
+          TError,
+          Awaited<ReturnType<typeof bookingControllerOpsRevisions>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useBookingControllerOpsRevisions<TData = Awaited<ReturnType<typeof bookingControllerOpsRevisions>>, TError = unknown>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof bookingControllerOpsRevisions>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useBookingControllerOpsRevisions<TData = Awaited<ReturnType<typeof bookingControllerOpsRevisions>>, TError = unknown>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof bookingControllerOpsRevisions>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getBookingControllerOpsRevisionsQueryOptions(id,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+
 export type bookingControllerOpsOneResponse200 = {
   data: void
   status: 200
@@ -564,7 +874,259 @@ export function useBookingControllerOpsOne<TData = Awaited<ReturnType<typeof boo
 
 
 
-export type bookingControllerDashboardResponse200 = {
+export type bookingControllerOpsUpdateResponse200 = {
+  data: void
+  status: 200
+}
+    
+export type bookingControllerOpsUpdateResponseSuccess = (bookingControllerOpsUpdateResponse200) & {
+  headers: Headers;
+};
+;
+
+export type bookingControllerOpsUpdateResponse = (bookingControllerOpsUpdateResponseSuccess)
+
+export const getBookingControllerOpsUpdateUrl = (id: string,) => {
+
+
+  
+
+  return `/api/v1/ops/bookings/${id}`
+}
+
+export const bookingControllerOpsUpdate = async (id: string,
+    updateBookingDto: UpdateBookingDto, options?: RequestInit): Promise<bookingControllerOpsUpdateResponse> => {
+  
+  const res = await fetch(getBookingControllerOpsUpdateUrl(id),
+  {      
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      updateBookingDto,)
+  }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+  
+  const data: bookingControllerOpsUpdateResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as bookingControllerOpsUpdateResponse
+}
+
+
+
+
+export const getBookingControllerOpsUpdateMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bookingControllerOpsUpdate>>, TError,{id: string;data: UpdateBookingDto}, TContext>, fetch?: RequestInit}
+): UseMutationOptions<Awaited<ReturnType<typeof bookingControllerOpsUpdate>>, TError,{id: string;data: UpdateBookingDto}, TContext> => {
+
+const mutationKey = ['bookingControllerOpsUpdate'];
+const {mutation: mutationOptions, fetch: fetchOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, fetch: undefined};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof bookingControllerOpsUpdate>>, {id: string;data: UpdateBookingDto}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  bookingControllerOpsUpdate(id,data,fetchOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type BookingControllerOpsUpdateMutationResult = NonNullable<Awaited<ReturnType<typeof bookingControllerOpsUpdate>>>
+    export type BookingControllerOpsUpdateMutationBody = UpdateBookingDto
+    export type BookingControllerOpsUpdateMutationError = unknown
+
+    export const useBookingControllerOpsUpdate = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bookingControllerOpsUpdate>>, TError,{id: string;data: UpdateBookingDto}, TContext>, fetch?: RequestInit}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof bookingControllerOpsUpdate>>,
+        TError,
+        {id: string;data: UpdateBookingDto},
+        TContext
+      > => {
+
+      const mutationOptions = getBookingControllerOpsUpdateMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    export type bookingControllerOpsCancelResponse201 = {
+  data: void
+  status: 201
+}
+    
+export type bookingControllerOpsCancelResponseSuccess = (bookingControllerOpsCancelResponse201) & {
+  headers: Headers;
+};
+;
+
+export type bookingControllerOpsCancelResponse = (bookingControllerOpsCancelResponseSuccess)
+
+export const getBookingControllerOpsCancelUrl = (id: string,) => {
+
+
+  
+
+  return `/api/v1/ops/bookings/${id}/cancel`
+}
+
+export const bookingControllerOpsCancel = async (id: string,
+    bookingActionDto: BookingActionDto, options?: RequestInit): Promise<bookingControllerOpsCancelResponse> => {
+  
+  const res = await fetch(getBookingControllerOpsCancelUrl(id),
+  {      
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      bookingActionDto,)
+  }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+  
+  const data: bookingControllerOpsCancelResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as bookingControllerOpsCancelResponse
+}
+
+
+
+
+export const getBookingControllerOpsCancelMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bookingControllerOpsCancel>>, TError,{id: string;data: BookingActionDto}, TContext>, fetch?: RequestInit}
+): UseMutationOptions<Awaited<ReturnType<typeof bookingControllerOpsCancel>>, TError,{id: string;data: BookingActionDto}, TContext> => {
+
+const mutationKey = ['bookingControllerOpsCancel'];
+const {mutation: mutationOptions, fetch: fetchOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, fetch: undefined};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof bookingControllerOpsCancel>>, {id: string;data: BookingActionDto}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  bookingControllerOpsCancel(id,data,fetchOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type BookingControllerOpsCancelMutationResult = NonNullable<Awaited<ReturnType<typeof bookingControllerOpsCancel>>>
+    export type BookingControllerOpsCancelMutationBody = BookingActionDto
+    export type BookingControllerOpsCancelMutationError = unknown
+
+    export const useBookingControllerOpsCancel = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bookingControllerOpsCancel>>, TError,{id: string;data: BookingActionDto}, TContext>, fetch?: RequestInit}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof bookingControllerOpsCancel>>,
+        TError,
+        {id: string;data: BookingActionDto},
+        TContext
+      > => {
+
+      const mutationOptions = getBookingControllerOpsCancelMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    export type bookingControllerOpsRejectResponse201 = {
+  data: void
+  status: 201
+}
+    
+export type bookingControllerOpsRejectResponseSuccess = (bookingControllerOpsRejectResponse201) & {
+  headers: Headers;
+};
+;
+
+export type bookingControllerOpsRejectResponse = (bookingControllerOpsRejectResponseSuccess)
+
+export const getBookingControllerOpsRejectUrl = (id: string,) => {
+
+
+  
+
+  return `/api/v1/ops/bookings/${id}/reject`
+}
+
+export const bookingControllerOpsReject = async (id: string,
+    bookingActionDto: BookingActionDto, options?: RequestInit): Promise<bookingControllerOpsRejectResponse> => {
+  
+  const res = await fetch(getBookingControllerOpsRejectUrl(id),
+  {      
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      bookingActionDto,)
+  }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+  
+  const data: bookingControllerOpsRejectResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as bookingControllerOpsRejectResponse
+}
+
+
+
+
+export const getBookingControllerOpsRejectMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bookingControllerOpsReject>>, TError,{id: string;data: BookingActionDto}, TContext>, fetch?: RequestInit}
+): UseMutationOptions<Awaited<ReturnType<typeof bookingControllerOpsReject>>, TError,{id: string;data: BookingActionDto}, TContext> => {
+
+const mutationKey = ['bookingControllerOpsReject'];
+const {mutation: mutationOptions, fetch: fetchOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, fetch: undefined};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof bookingControllerOpsReject>>, {id: string;data: BookingActionDto}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  bookingControllerOpsReject(id,data,fetchOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type BookingControllerOpsRejectMutationResult = NonNullable<Awaited<ReturnType<typeof bookingControllerOpsReject>>>
+    export type BookingControllerOpsRejectMutationBody = BookingActionDto
+    export type BookingControllerOpsRejectMutationError = unknown
+
+    export const useBookingControllerOpsReject = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bookingControllerOpsReject>>, TError,{id: string;data: BookingActionDto}, TContext>, fetch?: RequestInit}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof bookingControllerOpsReject>>,
+        TError,
+        {id: string;data: BookingActionDto},
+        TContext
+      > => {
+
+      const mutationOptions = getBookingControllerOpsRejectMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    export type bookingControllerDashboardResponse200 = {
   data: void
   status: 200
 }

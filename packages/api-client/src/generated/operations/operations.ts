@@ -584,3 +584,227 @@ export function useOperationsControllerCustomers<TData = Awaited<ReturnType<type
 
 
 
+export type operationsControllerCustomerSitesResponse200 = {
+  data: void
+  status: 200
+}
+    
+export type operationsControllerCustomerSitesResponseSuccess = (operationsControllerCustomerSitesResponse200) & {
+  headers: Headers;
+};
+;
+
+export type operationsControllerCustomerSitesResponse = (operationsControllerCustomerSitesResponseSuccess)
+
+export const getOperationsControllerCustomerSitesUrl = (id: string,) => {
+
+
+  
+
+  return `/api/v1/ops/customers/${id}/sites`
+}
+
+export const operationsControllerCustomerSites = async (id: string, options?: RequestInit): Promise<operationsControllerCustomerSitesResponse> => {
+  
+  const res = await fetch(getOperationsControllerCustomerSitesUrl(id),
+  {      
+    ...options,
+    method: 'GET'
+    
+    
+  }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+  
+  const data: operationsControllerCustomerSitesResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as operationsControllerCustomerSitesResponse
+}
+
+
+
+
+
+export const getOperationsControllerCustomerSitesQueryKey = (id?: string,) => {
+    return [
+    `/api/v1/ops/customers/${id}/sites`
+    ] as const;
+    }
+
+    
+export const getOperationsControllerCustomerSitesQueryOptions = <TData = Awaited<ReturnType<typeof operationsControllerCustomerSites>>, TError = unknown>(id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof operationsControllerCustomerSites>>, TError, TData>>, fetch?: RequestInit}
+) => {
+
+const {query: queryOptions, fetch: fetchOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getOperationsControllerCustomerSitesQueryKey(id);
+
+  
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof operationsControllerCustomerSites>>> = ({ signal }) => operationsControllerCustomerSites(id, { signal, ...fetchOptions });
+
+      
+
+      
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof operationsControllerCustomerSites>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type OperationsControllerCustomerSitesQueryResult = NonNullable<Awaited<ReturnType<typeof operationsControllerCustomerSites>>>
+export type OperationsControllerCustomerSitesQueryError = unknown
+
+
+export function useOperationsControllerCustomerSites<TData = Awaited<ReturnType<typeof operationsControllerCustomerSites>>, TError = unknown>(
+ id: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof operationsControllerCustomerSites>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof operationsControllerCustomerSites>>,
+          TError,
+          Awaited<ReturnType<typeof operationsControllerCustomerSites>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useOperationsControllerCustomerSites<TData = Awaited<ReturnType<typeof operationsControllerCustomerSites>>, TError = unknown>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof operationsControllerCustomerSites>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof operationsControllerCustomerSites>>,
+          TError,
+          Awaited<ReturnType<typeof operationsControllerCustomerSites>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useOperationsControllerCustomerSites<TData = Awaited<ReturnType<typeof operationsControllerCustomerSites>>, TError = unknown>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof operationsControllerCustomerSites>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useOperationsControllerCustomerSites<TData = Awaited<ReturnType<typeof operationsControllerCustomerSites>>, TError = unknown>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof operationsControllerCustomerSites>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getOperationsControllerCustomerSitesQueryOptions(id,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+
+export type operationsControllerUsersResponse200 = {
+  data: void
+  status: 200
+}
+    
+export type operationsControllerUsersResponseSuccess = (operationsControllerUsersResponse200) & {
+  headers: Headers;
+};
+;
+
+export type operationsControllerUsersResponse = (operationsControllerUsersResponseSuccess)
+
+export const getOperationsControllerUsersUrl = () => {
+
+
+  
+
+  return `/api/v1/ops/users`
+}
+
+export const operationsControllerUsers = async ( options?: RequestInit): Promise<operationsControllerUsersResponse> => {
+  
+  const res = await fetch(getOperationsControllerUsersUrl(),
+  {      
+    ...options,
+    method: 'GET'
+    
+    
+  }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+  
+  const data: operationsControllerUsersResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as operationsControllerUsersResponse
+}
+
+
+
+
+
+export const getOperationsControllerUsersQueryKey = () => {
+    return [
+    `/api/v1/ops/users`
+    ] as const;
+    }
+
+    
+export const getOperationsControllerUsersQueryOptions = <TData = Awaited<ReturnType<typeof operationsControllerUsers>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof operationsControllerUsers>>, TError, TData>>, fetch?: RequestInit}
+) => {
+
+const {query: queryOptions, fetch: fetchOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getOperationsControllerUsersQueryKey();
+
+  
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof operationsControllerUsers>>> = ({ signal }) => operationsControllerUsers({ signal, ...fetchOptions });
+
+      
+
+      
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof operationsControllerUsers>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type OperationsControllerUsersQueryResult = NonNullable<Awaited<ReturnType<typeof operationsControllerUsers>>>
+export type OperationsControllerUsersQueryError = unknown
+
+
+export function useOperationsControllerUsers<TData = Awaited<ReturnType<typeof operationsControllerUsers>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof operationsControllerUsers>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof operationsControllerUsers>>,
+          TError,
+          Awaited<ReturnType<typeof operationsControllerUsers>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useOperationsControllerUsers<TData = Awaited<ReturnType<typeof operationsControllerUsers>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof operationsControllerUsers>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof operationsControllerUsers>>,
+          TError,
+          Awaited<ReturnType<typeof operationsControllerUsers>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useOperationsControllerUsers<TData = Awaited<ReturnType<typeof operationsControllerUsers>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof operationsControllerUsers>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useOperationsControllerUsers<TData = Awaited<ReturnType<typeof operationsControllerUsers>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof operationsControllerUsers>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getOperationsControllerUsersQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+

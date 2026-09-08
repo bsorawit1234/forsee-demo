@@ -58,18 +58,47 @@ enum VehicleStatus {
   INACTIVE
 }
 
+enum BookingSource {
+  CUSTOMER_PORTAL
+  ADMIN_PHONE
+  ADMIN_MANUAL
+  IMPORT
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  WAITING
+  BLOCKED
+  DONE
+  CANCELLED
+}
+
+enum TaskPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
 model User {
-  id              String                   @id @default(uuid()) @db.Uuid
-  email           String                   @unique
-  passwordHash    String                   @map("password_hash")
-  displayName     String                   @map("display_name")
-  phone           String?
-  status          UserStatus               @default(INVITED)
-  emailVerifiedAt DateTime?                @map("email_verified_at")
-  lastLoginAt     DateTime?                @map("last_login_at")
-  memberships     OrganizationMembership[]
-  createdAt       DateTime                 @default(now()) @map("created_at")
-  updatedAt       DateTime                 @updatedAt @map("updated_at")
+  id                  String                   @id @default(uuid()) @db.Uuid
+  email               String                   @unique
+  passwordHash        String                   @map("password_hash")
+  displayName         String                   @map("display_name")
+  phone               String?
+  status              UserStatus               @default(INVITED)
+  emailVerifiedAt     DateTime?                @map("email_verified_at")
+  lastLoginAt         DateTime?                @map("last_login_at")
+  memberships         OrganizationMembership[]
+  createdAt           DateTime                 @default(now()) @map("created_at")
+  updatedAt           DateTime                 @updatedAt @map("updated_at")
+  createdBookings     Booking[]                @relation("BookingCreatedBy")
+  updatedBookings     Booking[]                @relation("BookingUpdatedBy")
+  responsibleBookings Booking[]                @relation("BookingResponsible")
+  assignedTasks       OperationTask[]          @relation("TaskAssignee")
+  createdTasks        OperationTask[]          @relation("TaskCreatedBy")
+  updatedTasks        OperationTask[]          @relation("TaskUpdatedBy")
 
   @@map("users")
 }
@@ -231,6 +260,12 @@ model Booking {
   priority               Int                    @default(0)
   customerNote           String?                @map("customer_note")
   internalNote           String?                @map("internal_note")
+  source                 BookingSource          @default(CUSTOMER_PORTAL)
+  updatedByUserId        String?                @map("updated_by_user_id") @db.Uuid
+  responsibleUserId      String?                @map("responsible_user_id") @db.Uuid
+  lastChangeReason       String?                @map("last_change_reason")
+  contactNameSnapshot    String?                @map("contact_name_snapshot")
+  contactPhoneSnapshot   String?                @map("contact_phone_snapshot")
   version                Int                    @default(1)
   createdByUserId        String                 @map("created_by_user_id") @db.Uuid
   confirmedByUserId      String?                @map("confirmed_by_user_id") @db.Uuid
@@ -239,10 +274,15 @@ model Booking {
   customerOrganization   Organization           @relation(fields: [customerOrganizationId], references: [id])
   customerSite           CustomerSite           @relation(fields: [customerSiteId], references: [id])
   serviceType            ServiceType            @relation(fields: [serviceTypeId], references: [id])
+  createdBy              User                   @relation("BookingCreatedBy", fields: [createdByUserId], references: [id])
+  updatedBy              User?                  @relation("BookingUpdatedBy", fields: [updatedByUserId], references: [id])
+  responsibleUser        User?                  @relation("BookingResponsible", fields: [responsibleUserId], references: [id])
   assignments            BookingAssignment[]
   statusHistory          BookingStatusHistory[]
   jobEvents              JobEvent[]
   attachments            Attachment[]
+  revisions              BookingRevision[]
+  tasks                  OperationTask[]
   createdAt              DateTime               @default(now()) @map("created_at")
   updatedAt              DateTime               @updatedAt @map("updated_at")
 
@@ -250,7 +290,72 @@ model Booking {
   @@index([requestedStartAt, requestedEndAt])
   @@index([bookingStatus, assignmentStatus, jobStage])
   @@index([slaHealth])
+  @@index([responsibleUserId, updatedAt])
+  @@index([source, createdAt])
   @@map("bookings")
+}
+
+model BookingRevision {
+  id            String   @id @default(uuid()) @db.Uuid
+  bookingId     String   @map("booking_id") @db.Uuid
+  version       Int
+  actorUserId   String   @map("actor_user_id") @db.Uuid
+  action        String
+  reason        String?
+  changedFields Json     @map("changed_fields")
+  beforeJson    Json     @map("before_json")
+  afterJson     Json     @map("after_json")
+  occurredAt    DateTime @default(now()) @map("occurred_at")
+  booking       Booking  @relation(fields: [bookingId], references: [id])
+
+  @@unique([bookingId, version])
+  @@index([bookingId, occurredAt])
+  @@map("booking_revisions")
+}
+
+model OperationTask {
+  id              String         @id @default(uuid()) @db.Uuid
+  bookingId       String         @map("booking_id") @db.Uuid
+  parentTaskId    String?        @map("parent_task_id") @db.Uuid
+  title           String
+  description     String?
+  status          TaskStatus     @default(TODO)
+  priority        TaskPriority   @default(NORMAL)
+  assigneeUserId  String?        @map("assignee_user_id") @db.Uuid
+  dueAt           DateTime?      @map("due_at")
+  isRequired      Boolean        @default(false) @map("is_required")
+  sortOrder       Int            @default(0) @map("sort_order")
+  version         Int            @default(1)
+  createdByUserId String         @map("created_by_user_id") @db.Uuid
+  updatedByUserId String?        @map("updated_by_user_id") @db.Uuid
+  completedAt     DateTime?      @map("completed_at")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+  booking         Booking        @relation(fields: [bookingId], references: [id])
+  assignee        User?          @relation("TaskAssignee", fields: [assigneeUserId], references: [id])
+  createdBy       User           @relation("TaskCreatedBy", fields: [createdByUserId], references: [id])
+  updatedBy       User?          @relation("TaskUpdatedBy", fields: [updatedByUserId], references: [id])
+  activities      TaskActivity[]
+
+  @@index([bookingId, status])
+  @@index([assigneeUserId, status, dueAt])
+  @@map("operation_tasks")
+}
+
+model TaskActivity {
+  id          String        @id @default(uuid()) @db.Uuid
+  taskId      String        @map("task_id") @db.Uuid
+  actorUserId String        @map("actor_user_id") @db.Uuid
+  action      String
+  reason      String?
+  note        String?
+  beforeJson  Json?         @map("before_json")
+  afterJson   Json?         @map("after_json")
+  occurredAt  DateTime      @default(now()) @map("occurred_at")
+  task        OperationTask @relation(fields: [taskId], references: [id])
+
+  @@index([taskId, occurredAt])
+  @@map("task_activities")
 }
 
 model BookingAssignment {

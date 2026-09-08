@@ -5,8 +5,9 @@
  * Booking and operations API for Foresee Corporation
  * OpenAPI spec version: 1.0
  */
+import type { CreateOpsBookingDtoSource } from './createOpsBookingDtoSource';
 
-export interface CreateBookingDto {
+export interface CreateOpsBookingDto {
   serviceCode: string;
   customerSiteId: string;
   requestedDate: string;
@@ -15,4 +16,11 @@ export interface CreateBookingDto {
   estimatedVolume?: number;
   volumeUnit?: string;
   customerNote?: string;
+  customerOrganizationId: string;
+  source?: CreateOpsBookingDtoSource;
+  internalNote?: string;
+  responsibleUserId?: string;
+  contactName?: string;
+  contactPhone?: string;
+  confirmImmediately?: boolean;
 }

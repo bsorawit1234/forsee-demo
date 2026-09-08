@@ -1,4 +1,4 @@
-import { IsInt, IsOptional, IsString, IsUUID, Matches, Max, Min } from 'class-validator';
+import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, IsUUID, Matches, Max, Min } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateBookingDto {
@@ -38,6 +38,121 @@ export class CreateBookingDto {
   @IsOptional()
   @IsString()
   customerNote?: string;
+}
+
+export class CreateOpsBookingDto extends CreateBookingDto {
+  @ApiProperty({ format: 'uuid', type: String })
+  @IsUUID()
+  customerOrganizationId!: string;
+
+  @ApiPropertyOptional({ example: 'ADMIN_PHONE', enum: ['ADMIN_PHONE', 'ADMIN_MANUAL'] })
+  @IsOptional()
+  @IsEnum(['ADMIN_PHONE', 'ADMIN_MANUAL'])
+  source?: 'ADMIN_PHONE' | 'ADMIN_MANUAL';
+
+  @ApiPropertyOptional({ example: 'ลูกค้าโทรยืนยันกับคุณเอ', type: String })
+  @IsOptional()
+  @IsString()
+  internalNote?: string;
+
+  @ApiPropertyOptional({ format: 'uuid', type: String })
+  @IsOptional()
+  @IsUUID()
+  responsibleUserId?: string;
+
+  @ApiPropertyOptional({ example: 'คุณเอ', type: String })
+  @IsOptional()
+  @IsString()
+  contactName?: string;
+
+  @ApiPropertyOptional({ example: '0812345678', type: String })
+  @IsOptional()
+  @IsString()
+  contactPhone?: string;
+
+  @ApiPropertyOptional({ example: false, type: Boolean })
+  @IsOptional()
+  @IsBoolean()
+  confirmImmediately?: boolean;
+}
+
+export class UpdateBookingDto {
+  @ApiProperty({ example: 1, type: Number })
+  @IsInt()
+  @Min(1)
+  version!: number;
+
+  @ApiPropertyOptional({ example: 'GREASE_TRAP', type: String })
+  @IsOptional()
+  @IsString()
+  serviceCode?: string;
+
+  @ApiPropertyOptional({ format: 'uuid', type: String })
+  @IsOptional()
+  @IsUUID()
+  customerSiteId?: string;
+
+  @ApiPropertyOptional({ example: '2026-09-10', type: String })
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  requestedDate?: string;
+
+  @ApiPropertyOptional({ example: '10:00', type: String })
+  @IsOptional()
+  @Matches(/^\d{2}:\d{2}$/)
+  requestedStart?: string;
+
+  @ApiPropertyOptional({ example: '12:30', type: String })
+  @IsOptional()
+  @Matches(/^\d{2}:\d{2}$/)
+  requestedEnd?: string;
+
+  @ApiPropertyOptional({ example: 10, type: Number })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(100000)
+  estimatedVolume?: number;
+
+  @ApiPropertyOptional({ example: 'ลบ.ม.', type: String })
+  @IsOptional()
+  @IsString()
+  volumeUnit?: string;
+
+  @ApiPropertyOptional({ example: 'เข้าทางประตู 2', type: String })
+  @IsOptional()
+  @IsString()
+  customerNote?: string;
+
+  @ApiPropertyOptional({ example: 'โทรยืนยันแล้ว ลูกค้าขอเลื่อนเวลา', type: String })
+  @IsOptional()
+  @IsString()
+  internalNote?: string;
+
+  @ApiPropertyOptional({ format: 'uuid', type: String })
+  @IsOptional()
+  @IsUUID()
+  responsibleUserId?: string;
+
+  @ApiProperty({ example: 'ลูกค้าขอเลื่อนเวลาและเพิ่มปริมาณ', type: String })
+  @IsString()
+  changeReason!: string;
+
+  @ApiPropertyOptional({ example: 'UNASSIGN_IF_INVALID', enum: ['UNASSIGN_IF_INVALID', 'CANCEL_EDIT'] })
+  @IsOptional()
+  @IsEnum(['UNASSIGN_IF_INVALID', 'CANCEL_EDIT'])
+  assignmentResolution?: 'UNASSIGN_IF_INVALID' | 'CANCEL_EDIT';
+
+  @ApiPropertyOptional({ example: false, type: Boolean })
+  @IsOptional()
+  @IsBoolean()
+  override?: boolean;
+}
+
+export class BookingActionDto {
+  @ApiProperty({ example: 'ลูกค้าขอยกเลิกทางโทรศัพท์', type: String })
+  @IsString()
+  reason!: string;
 }
 
 export class BookingListQueryDto {

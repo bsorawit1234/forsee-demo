@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { advanceOperationBooking, assignOperationBooking, confirmOperationBooking, fetchCustomerAvailability, fetchCustomerBookings, fetchCustomerSites, fetchOperationsBookings, fetchOperationsVehicles, isApiEnabled, loginDemo, submitCustomerBooking, watchOperationEvents, type ApiAvailabilityResponse, type ApiBooking, type ApiSessionUser, type ApiVehicle } from './lib/api';
+import { advanceOperationBooking, assignOperationBooking, cancelOperationsBooking, confirmOperationBooking, createBookingTask, createOperationsBooking, fetchBookingTasks, fetchCustomerAvailability, fetchCustomerBookings, fetchCustomerSites, fetchOperationBooking, fetchOperationsBookings, fetchOperationsCustomerSites, fetchOperationsCustomers, fetchOperationsUsers, fetchOperationsVehicles, fetchOwnerAudit, fetchServices, isApiEnabled, loginDemo, submitCustomerBooking, updateBookingTaskStatus, updateOperationsBooking, watchOperationEvents, type ApiAvailabilityResponse, type ApiAuditLog, type ApiBooking, type ApiBookingDetail, type ApiSessionUser, type ApiTask, type ApiVehicle, type OpsBookingPayload, type OpsBookingUpdatePayload } from './lib/api';
 import { formatThaiDate } from './lib/format';
 import {
   AlertTriangle,
@@ -29,9 +29,9 @@ import {
 } from 'lucide-react';
 
 type Portal = 'company' | 'customer';
-type CompanyView = 'overview' | 'bookings' | 'calendar' | 'fleet' | 'customers' | 'reports';
+type CompanyView = 'overview' | 'bookings' | 'calendar' | 'fleet' | 'customers' | 'reports' | 'audit';
 type CustomerView = 'new-booking' | 'bookings' | 'company';
-type BookingStatus = 'รอยืนยัน' | 'ยืนยันแล้ว' | 'กำลังดำเนินการ' | 'เสร็จสิ้น';
+type BookingStatus = 'รอยืนยัน' | 'ยืนยันแล้ว' | 'กำลังดำเนินการ' | 'เสร็จสิ้น' | 'ยกเลิก' | 'ปฏิเสธ';
 type JobStage = 'รอเริ่มงาน' | 'กำลังเดินทาง' | 'ถึงหน้างาน' | 'กำลังให้บริการ' | 'เสร็จสิ้น';
 
 type Booking = {
@@ -52,7 +52,20 @@ type Booking = {
   stage: JobStage;
   sla: 'ปกติ' | 'ต้องติดตาม' | 'เกินกำหนด';
   customerNote?: string;
+  estimatedVolume?: number | string | null;
+  volumeUnit?: string | null;
   recordVersion?: number;
+  source?: string;
+  createdBy?: { id: string; displayName: string; role?: string } | null;
+  updatedBy?: { id: string; displayName: string } | null;
+  responsibleUser?: { id: string; displayName: string } | null;
+  responsibleUserId?: string | null;
+  lastChangeReason?: string | null;
+  contactName?: string | null;
+  contactPhone?: string | null;
+  customerOrganizationId?: string;
+  customerSiteId?: string;
+  serviceCode?: string;
 };
 
 type VehicleResource = {
@@ -108,6 +121,7 @@ const companyNav: Array<{ id: CompanyView; label: string; icon: typeof LayoutDas
   { id: 'fleet', label: 'รถและทีมงาน', icon: Truck },
   { id: 'customers', label: 'ลูกค้า', icon: Users },
   { id: 'reports', label: 'รายงาน', icon: Gauge },
+  { id: 'audit', label: 'Audit Center', icon: ShieldCheck },
 ];
 
 const statusClass: Record<BookingStatus, string> = {
@@ -115,6 +129,8 @@ const statusClass: Record<BookingStatus, string> = {
   'ยืนยันแล้ว': 'status-confirmed',
   'กำลังดำเนินการ': 'status-progress',
   'เสร็จสิ้น': 'status-complete',
+  'ยกเลิก': 'status-cancelled',
+  'ปฏิเสธ': 'status-cancelled',
 };
 
 const stageClass: Record<JobStage, string> = {
@@ -131,10 +147,10 @@ function toUiBooking(item: ApiBooking): Booking {
   const dateParts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Bangkok', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(start).reduce<Record<string, string>>((parts, part) => { parts[part.type] = part.value; return parts; }, {});
   const thaiDate = `${dateParts.year}-${dateParts.month}-${dateParts.day}`;
   const clock = (value: Date) => new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit', hour12: false }).format(value);
-  const statuses: Record<string, BookingStatus> = { PENDING_CONFIRMATION: 'รอยืนยัน', CONFIRMED: 'ยืนยันแล้ว', REJECTED: 'รอยืนยัน', CANCELLED: 'เสร็จสิ้น' };
+  const statuses: Record<string, BookingStatus> = { PENDING_CONFIRMATION: 'รอยืนยัน', CONFIRMED: 'ยืนยันแล้ว', REJECTED: 'ปฏิเสธ', CANCELLED: 'ยกเลิก' };
   const stages: Record<string, JobStage> = { SCHEDULED: 'รอเริ่มงาน', EN_ROUTE: 'กำลังเดินทาง', ARRIVED: 'ถึงหน้างาน', IN_SERVICE: 'กำลังให้บริการ', COMPLETED: 'เสร็จสิ้น' };
   const status = item.jobStage === 'IN_SERVICE' ? 'กำลังดำเนินการ' : item.jobStage === 'COMPLETED' ? 'เสร็จสิ้น' : statuses[item.bookingStatus] ?? 'ยืนยันแล้ว';
-  return { id: item.bookingNumber, recordId: item.id, customer: item.customer ?? 'ไม่ระบุลูกค้า', service: item.service ?? 'ไม่ระบุบริการ', site: item.site ?? 'ไม่ระบุสถานที่', date: thaiDate, start: clock(start), end: clock(end), vehicle: item.vehicle ?? 'ยังไม่จัดรถ', vehicleId: item.vehicleId ?? undefined, vehicleRegistrationNumber: item.vehicleRegistrationNumber ?? undefined, vehicleType: item.vehicleType ?? undefined, driver: item.vehicle ? 'ทีมภาคสนาม' : 'ยังไม่จัดทีม', status, stage: stages[item.jobStage] ?? 'รอเริ่มงาน', sla: item.slaHealth === 'OVERDUE' ? 'เกินกำหนด' : item.slaHealth === 'AT_RISK' ? 'ต้องติดตาม' : 'ปกติ', customerNote: item.customerNote ?? undefined, recordVersion: item.version };
+  return { id: item.bookingNumber, recordId: item.id, customer: item.customer ?? 'ไม่ระบุลูกค้า', service: item.service ?? 'ไม่ระบุบริการ', site: item.site ?? 'ไม่ระบุสถานที่', date: thaiDate, start: clock(start), end: clock(end), vehicle: item.vehicle ?? 'ยังไม่จัดรถ', vehicleId: item.vehicleId ?? undefined, vehicleRegistrationNumber: item.vehicleRegistrationNumber ?? undefined, vehicleType: item.vehicleType ?? undefined, driver: item.vehicle ? 'ทีมภาคสนาม' : 'ยังไม่จัดทีม', status, stage: stages[item.jobStage] ?? 'รอเริ่มงาน', sla: item.slaHealth === 'OVERDUE' ? 'เกินกำหนด' : item.slaHealth === 'AT_RISK' ? 'ต้องติดตาม' : 'ปกติ', customerNote: item.customerNote ?? undefined, estimatedVolume: item.estimatedVolume ?? null, volumeUnit: item.volumeUnit ?? null, recordVersion: item.version, source: item.source, createdBy: item.createdBy, updatedBy: item.updatedBy, responsibleUser: item.responsibleUser, responsibleUserId: item.responsibleUserId, lastChangeReason: item.lastChangeReason, contactName: item.contactName, contactPhone: item.contactPhone, customerOrganizationId: item.customerOrganizationId, customerSiteId: item.customerSiteId, serviceCode: item.serviceCode };
 }
 
 function toUiVehicle(item: ApiVehicle): VehicleResource {
@@ -155,6 +171,8 @@ export default function App() {
   const [toast, setToast] = useState('');
   const [session, setSession] = useState<ApiSessionUser | null>(null);
   const [liveMode, setLiveMode] = useState(false);
+  const [createOpsOpen, setCreateOpsOpen] = useState(false);
+  const [editOpsBooking, setEditOpsBooking] = useState<Booking | null>(null);
   const eventStopRef = useRef<() => void>(() => undefined);
 
   useEffect(() => {
@@ -292,6 +310,54 @@ export default function App() {
     return true;
   };
 
+  const cancelBooking = async (booking: Booking, reason: string) => {
+    if (isApiEnabled() && booking.recordId) {
+      try {
+        const result = await cancelOperationsBooking(booking.recordId, reason);
+        const cancelled = toUiBooking(result);
+        setBookings((current) => current.map((item) => item.id === booking.id ? cancelled : item));
+        setSelectedBooking(cancelled);
+        notify(`ยกเลิก ${booking.id} แล้ว`);
+        return true;
+      } catch (error) {
+        notify(error instanceof Error ? error.message : 'ยกเลิก Booking ไม่สำเร็จ');
+        return false;
+      }
+    }
+    const cancelled = { ...booking, status: 'ยกเลิก' as BookingStatus };
+    setBookings((current) => current.map((item) => item.id === booking.id ? cancelled : item));
+    setSelectedBooking(cancelled);
+    notify(`ยกเลิก ${booking.id} แล้ว`);
+    return true;
+  };
+
+  const saveOpsBooking = async (payload: OpsBookingPayload | OpsBookingUpdatePayload, mode: 'create' | 'edit', booking?: Booking) => {
+    try {
+      const result = isApiEnabled()
+        ? mode === 'create'
+          ? await createOperationsBooking(payload as OpsBookingPayload)
+          : await updateOperationsBooking(booking?.recordId ?? '', payload as OpsBookingUpdatePayload)
+        : null;
+      if (result) {
+        const updated = toUiBooking(result);
+        setBookings((current) => mode === 'create' ? [updated, ...current] : current.map((item) => item.id === booking?.id ? updated : item));
+        setSelectedBooking(updated);
+        notify(mode === 'create' ? `สร้าง ${updated.id} แล้ว` : `บันทึกการแก้ไข ${updated.id} แล้ว`);
+      } else if (booking) {
+        const draft = payload as OpsBookingUpdatePayload;
+        const next: Booking = { ...booking, date: draft.requestedDate ?? booking.date, start: draft.requestedStart ?? booking.start, end: draft.requestedEnd ?? booking.end, customerNote: draft.customerNote ?? booking.customerNote, recordVersion: (booking.recordVersion ?? 1) + 1 };
+        setBookings((current) => current.map((item) => item.id === booking.id ? next : item));
+        setSelectedBooking(next);
+      }
+      setCreateOpsOpen(false);
+      setEditOpsBooking(null);
+      return true;
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'บันทึกไม่สำเร็จ กรุณาลองใหม่');
+      return false;
+    }
+  };
+
   return (
     <div className="platform-shell">
       {portal === 'company' ? (
@@ -307,6 +373,9 @@ export default function App() {
           onAssignBooking={assignBooking}
           onAdvanceBooking={advanceBooking}
           onConfirmBooking={confirmBooking}
+          onCancelBooking={cancelBooking}
+          onCreateBooking={() => setCreateOpsOpen(true)}
+          onEditBooking={setEditOpsBooking}
           onSwitchPortal={switchPortal}
           notify={notify}
         />
@@ -321,6 +390,8 @@ export default function App() {
           notify={notify}
         />
       )}
+      {createOpsOpen && <OpsBookingModal mode="create" onClose={() => setCreateOpsOpen(false)} onSave={(payload) => saveOpsBooking(payload, 'create')} />}
+      {editOpsBooking && <OpsBookingModal mode="edit" booking={editOpsBooking} onClose={() => setEditOpsBooking(null)} onSave={(payload) => saveOpsBooking(payload, 'edit', editOpsBooking)} />}
       {toast && <div className="toast"><Check size={16} />{toast}</div>}
     </div>
   );
@@ -338,6 +409,9 @@ function CompanyPortal({
   onAssignBooking,
   onAdvanceBooking,
   onConfirmBooking,
+  onCancelBooking,
+  onCreateBooking,
+  onEditBooking,
   onSwitchPortal,
   notify,
 }: {
@@ -352,6 +426,9 @@ function CompanyPortal({
   onAssignBooking: (booking: Booking, vehicle: VehicleResource) => Promise<boolean>;
   onAdvanceBooking: (booking: Booking) => Promise<boolean>;
   onConfirmBooking: (booking: Booking) => boolean | Promise<boolean>;
+  onCancelBooking: (booking: Booking, reason: string) => Promise<boolean>;
+  onCreateBooking: () => void;
+  onEditBooking: (booking: Booking) => void;
   onSwitchPortal: (portal: Portal) => void;
   notify: (message: string) => void;
 }) {
@@ -362,7 +439,7 @@ function CompanyPortal({
         <div className="workspace"><div className="workspace-avatar">FC</div><div><b>Foresee Corp.</b><span>ศูนย์ปฏิบัติการ</span></div><ChevronDown size={15} /></div>
         <div className="nav-caption">เมนูหลัก</div>
         <nav className="side-nav" aria-label="เมนูบริษัท">
-          {companyNav.map((item) => { const Icon = item.icon; return <button key={item.id} className={view === item.id ? 'nav-link active' : 'nav-link'} onClick={() => onNavigate(item.id)}><Icon size={17} /><span>{item.label}</span>{item.count && <em>{item.count}</em>}</button>; })}
+          {companyNav.filter((item) => item.id !== 'audit' || session?.role === 'OWNER').map((item) => { const Icon = item.icon; return <button key={item.id} className={view === item.id ? 'nav-link active' : 'nav-link'} onClick={() => onNavigate(item.id)}><Icon size={17} /><span>{item.label}</span>{item.count && <em>{item.count}</em>}</button>; })}
         </nav>
         <div className="nav-caption nav-caption-gap">จัดการระบบ</div>
         <nav className="side-nav"><button className="nav-link" onClick={() => notify('ตั้งค่าระบบจะเปิดในเวอร์ชันถัดไป')}><Settings2 size={17} /><span>ตั้งค่าระบบ</span></button><button className="nav-link" onClick={() => notify('ศูนย์ช่วยเหลือพร้อมให้บริการ')}><ShieldCheck size={17} /><span>ช่วยเหลือ</span></button></nav>
@@ -371,15 +448,16 @@ function CompanyPortal({
       <main className="main-pane">
         <header className="topbar"><button className="mobile-menu" aria-label="เปิดเมนู"><Menu size={20} /></button><div className="breadcrumbs"><span>ศูนย์ปฏิบัติการ</span><b>/</b><strong>{companyNav.find((item) => item.id === view)?.label}</strong></div><div className="topbar-actions"><div className="live-indicator"><i />{liveMode ? 'ข้อมูลอัปเดตสด' : 'โหมดสาธิต'}</div><PortalSwitcher portal="company" onChange={onSwitchPortal} /><button className="icon-button" aria-label="ค้นหา" onClick={() => notify('ค้นหาได้จากหน้า Booking Monitor')}><Search size={17} /></button><button className="icon-button has-notification" aria-label="การแจ้งเตือน" onClick={() => notify('มี 2 รายการที่ต้องติดตาม')}><Bell size={17} /></button></div></header>
         <div className="content-area">
-          {view === 'overview' && <CompanyOverview bookings={bookings} onSelectBooking={onSelectBooking} onNavigate={onNavigate} onConfirmBooking={onConfirmBooking} notify={notify} />}
-          {view === 'bookings' && <BookingMonitor bookings={bookings} onSelectBooking={onSelectBooking} onNavigate={onNavigate} onConfirmBooking={onConfirmBooking} />}
+          {view === 'overview' && <CompanyOverview bookings={bookings} onSelectBooking={onSelectBooking} onNavigate={onNavigate} onConfirmBooking={onConfirmBooking} onCreateBooking={onCreateBooking} notify={notify} />}
+          {view === 'bookings' && <BookingMonitor bookings={bookings} onSelectBooking={onSelectBooking} onNavigate={onNavigate} onConfirmBooking={onConfirmBooking} onCreateBooking={onCreateBooking} />}
           {view === 'calendar' && <OperationsCalendar bookings={bookings} vehicles={vehicles} onSelectBooking={onSelectBooking} onAssignBooking={onAssignBooking} notify={notify} />}
           {view === 'fleet' && <FleetView bookings={bookings} vehicles={vehicles} notify={notify} />}
           {view === 'customers' && <CustomersView bookings={bookings} onSelectBooking={onSelectBooking} />}
           {view === 'reports' && <ReportsView bookings={bookings} />}
+          {view === 'audit' && session?.role === 'OWNER' && <OwnerAuditView notify={notify} />}
         </div>
       </main>
-      {selectedBooking && <BookingDrawer booking={selectedBooking} onClose={() => onSelectBooking(null)} onConfirmBooking={onConfirmBooking} onAdvanceBooking={onAdvanceBooking} />}
+      {selectedBooking && <BookingDrawer booking={selectedBooking} onClose={() => onSelectBooking(null)} onConfirmBooking={onConfirmBooking} onAdvanceBooking={onAdvanceBooking} onCancelBooking={onCancelBooking} onEditBooking={onEditBooking} notify={notify} />}
     </div>
   );
 }
@@ -388,12 +466,12 @@ function PortalSwitcher({ portal, onChange }: { portal: Portal; onChange: (porta
   return <label className="portal-switcher"><span>มุมมอง</span><select value={portal} onChange={(event) => onChange(event.target.value as Portal)} aria-label="เลือกมุมมอง"><option value="company">ฝั่งบริษัท</option><option value="customer">ฝั่งผู้จอง</option></select><ChevronDown size={13} /></label>;
 }
 
-function CompanyOverview({ bookings, onSelectBooking, onNavigate, onConfirmBooking, notify }: { bookings: Booking[]; onSelectBooking: (booking: Booking) => void; onNavigate: (view: CompanyView) => void; onConfirmBooking: (booking: Booking) => boolean | Promise<boolean>; notify: (message: string) => void }) {
+function CompanyOverview({ bookings, onSelectBooking, onNavigate, onConfirmBooking, onCreateBooking, notify }: { bookings: Booking[]; onSelectBooking: (booking: Booking) => void; onNavigate: (view: CompanyView) => void; onConfirmBooking: (booking: Booking) => boolean | Promise<boolean>; onCreateBooking: () => void; notify: (message: string) => void }) {
   const today = bookings.filter((item) => item.date === todayIso);
   const unassigned = today.filter((item) => item.vehicle === 'ยังไม่จัดรถ');
   const atRisk = bookings.filter((item) => item.sla !== 'ปกติ');
   return <>
-    <PageHeader eyebrow={`${formatThaiDate(todayIso)} · อัปเดตตามข้อมูลล่าสุด`} title="การดำเนินงานวันนี้" copy="ติดตาม Booking และทีมภาคสนามจากจุดเดียว" action={<button className="primary-button" onClick={() => onNavigate('bookings')}><Plus size={17} /> สร้างการจอง</button>} />
+    <PageHeader eyebrow={`${formatThaiDate(todayIso)} · อัปเดตตามข้อมูลล่าสุด`} title="การดำเนินงานวันนี้" copy="ติดตาม Booking และทีมภาคสนามจากจุดเดียว" action={<button className="primary-button" onClick={onCreateBooking}><Plus size={17} /> สร้างการจอง</button>} />
     <div className="toolbar"><div className="toolbar-search"><Search size={16} /><input placeholder="ค้นหาเลข Booking, ลูกค้า หรือสถานที่" /></div><button className="filter-button" onClick={() => onNavigate('bookings')}><Filter size={15} /> ตัวกรอง</button><button className="date-button"><CalendarDays size={15} /> {formatThaiDate(todayIso)} <ChevronDown size={14} /></button></div>
     <div className="metric-strip"><Metric label="งานวันนี้" value={String(today.length).padStart(2, '0')} note="Booking ทั้งหมด" tone="teal" icon={<CalendarDays size={17} />} /><Metric label="กำลังดำเนินการ" value={String(today.filter((item) => item.status === 'กำลังดำเนินการ').length).padStart(2, '0')} note={`จาก ${today.length} งาน`} tone="amber" icon={<Clock3 size={17} />} /><Metric label="ยังไม่จัดรถ" value={String(unassigned.length).padStart(2, '0')} note="ต้องจัดคิว" tone="blue" icon={<Truck size={17} />} /><Metric label="ต้องติดตาม" value={String(atRisk.length).padStart(2, '0')} note="SLA / conflict" tone="rose" icon={<AlertTriangle size={17} />} /></div>
     <div className="section-heading"><div><h2>งานวันนี้</h2><p>คลิก Booking เพื่อดูรายละเอียดและ timeline</p></div><button className="quiet-button" onClick={() => onNavigate('bookings')}>ดูทั้งหมด <ArrowRight size={15} /></button></div>
@@ -410,7 +488,7 @@ function Metric({ label, value, note, tone, icon }: { label: string; value: stri
   return <div className="metric"><div className={`metric-icon ${tone}`}>{icon}</div><div><span>{label}</span><strong>{value}</strong><small>{note}</small></div></div>;
 }
 
-function BookingMonitor({ bookings, onSelectBooking, onNavigate, onConfirmBooking }: { bookings: Booking[]; onSelectBooking: (booking: Booking) => void; onNavigate: (view: CompanyView) => void; onConfirmBooking: (booking: Booking) => boolean | Promise<boolean> }) {
+function BookingMonitor({ bookings, onSelectBooking, onNavigate, onConfirmBooking, onCreateBooking }: { bookings: Booking[]; onSelectBooking: (booking: Booking) => void; onNavigate: (view: CompanyView) => void; onConfirmBooking: (booking: Booking) => boolean | Promise<boolean>; onCreateBooking: () => void }) {
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('ทั้งหมด');
   const filtered = useMemo(() => bookings.filter((item) => {
@@ -418,7 +496,7 @@ function BookingMonitor({ bookings, onSelectBooking, onNavigate, onConfirmBookin
     return matchQuery && (status === 'ทั้งหมด' || item.status === status);
   }), [bookings, query, status]);
   return <>
-    <PageHeader eyebrow="Company Operations Center · Booking Monitor" title="การจองทั้งหมด" copy="ค้นหา ตรวจสอบ และจัดการทุก Booking ของ Foresee" action={<button className="primary-button" onClick={() => onNavigate('calendar')}><CalendarDays size={17} /> เปิดปฏิทินจัดคิว</button>} />
+    <PageHeader eyebrow="Company Operations Center · Booking Monitor" title="การจองทั้งหมด" copy="ค้นหา ตรวจสอบ และจัดการทุก Booking ของ Foresee" action={<div className="page-header-actions"><button className="secondary-button" onClick={() => onNavigate('calendar')}><CalendarDays size={17} /> เปิดปฏิทินจัดคิว</button><button className="primary-button" onClick={onCreateBooking}><Plus size={17} /> สร้างการจอง</button></div>} />
     <div className="panel monitor-panel"><div className="monitor-toolbar"><div className="toolbar-search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="ค้นหาเลข Booking, ลูกค้า หรือสถานที่" /></div><select className="select-control" value={status} onChange={(event) => setStatus(event.target.value)}><option>ทั้งหมด</option><option>รอยืนยัน</option><option>ยืนยันแล้ว</option><option>กำลังดำเนินการ</option><option>เสร็จสิ้น</option></select><button className="filter-button"><ListFilter size={15} /> ตัวกรองเพิ่มเติม</button><button className="icon-button small"><MoreHorizontal size={16} /></button></div><div className="table-meta"><span>แสดง {filtered.length} จาก {bookings.length} รายการ</span><span>อัปเดตสด <i className="live-dot" /></span></div><BookingBoard bookings={filtered} onSelectBooking={onSelectBooking} onConfirmBooking={onConfirmBooking} /></div>
   </>;
 }
@@ -548,35 +626,124 @@ function ReportsView({ bookings }: { bookings: Booking[] }) {
 
 function ReportBar({ label, value, max, tone }: { label: string; value: number; max: number; tone: string }) { return <div className="report-bar"><span>{label}</span><div><i className={tone} style={{ width: `${Math.max(8, (value / max) * 100)}%` }} /></div><b>{value}</b></div>; }
 
-function BookingDrawer({ booking, onClose, onConfirmBooking, onAdvanceBooking }: { booking: Booking; onClose: () => void; onConfirmBooking: (booking: Booking) => boolean | Promise<boolean>; onAdvanceBooking: (booking: Booking) => Promise<boolean> }) {
+function OwnerAuditView({ notify }: { notify: (message: string) => void }) {
+  const [items, setItems] = useState<ApiAuditLog[]>([]);
+  const [loading, setLoading] = useState(() => isApiEnabled());
+  const [error, setError] = useState('');
+  useEffect(() => {
+    if (!isApiEnabled()) return undefined;
+    fetchOwnerAudit({ pageSize: 50 }).then((result) => setItems(result.items)).catch((reason) => { const message = reason instanceof Error ? reason.message : 'โหลด Audit ไม่สำเร็จ'; setError(message); }).finally(() => setLoading(false));
+    return undefined;
+  }, []);
+  const formatTime = (value: string) => new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
+  return <><PageHeader eyebrow="Owner Control · Audit" title="Audit Center" copy="ตรวจสอบ privileged actions และการเปลี่ยนแปลงย้อนหลังของทั้งองค์กร" /><section className="panel audit-panel"><div className="panel-head"><div><h3>กิจกรรมล่าสุด</h3><p>ข้อมูล immutable จาก Booking, Task และ workflow</p></div><button className="quiet-button" onClick={() => { setLoading(true); fetchOwnerAudit({ pageSize: 50 }).then((result) => setItems(result.items)).catch(() => notify('โหลด Audit ไม่สำเร็จ')).finally(() => setLoading(false)); }}><ArrowRight size={15} /> รีเฟรช</button></div>{loading ? <div className="empty-table">กำลังโหลด Audit…</div> : error ? <div className="empty-table">{error}</div> : items.length ? <div className="audit-log-list">{items.map((item) => <div className="audit-log-row" key={item.id}><span className="audit-log-icon"><ShieldCheck size={14} /></span><div><b>{item.action}</b><small>{item.entityType} · {item.entityId}</small></div><div><b>{item.actorUser?.displayName ?? 'ระบบ'}</b><small>{formatTime(item.createdAt)}</small></div><span className="audit-log-reason">{String(item.afterJson?.changeReason ?? item.afterJson?.reason ?? '—')}</span></div>)}</div> : <div className="empty-table">ยังไม่มี Audit Log</div>}</section></>;
+}
+
+function BookingDrawer({ booking, onClose, onConfirmBooking, onAdvanceBooking, onCancelBooking, onEditBooking, notify }: { booking: Booking; onClose: () => void; onConfirmBooking: (booking: Booking) => boolean | Promise<boolean>; onAdvanceBooking: (booking: Booking) => Promise<boolean>; onCancelBooking: (booking: Booking, reason: string) => Promise<boolean>; onEditBooking: (booking: Booking) => void; notify: (message: string) => void }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [successOpen, setSuccessOpen] = useState(false);
   const [confirmBusy, setConfirmBusy] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelBusy, setCancelBusy] = useState(false);
+  const [detail, setDetail] = useState<ApiBookingDetail | null>(null);
+  const [tasks, setTasks] = useState<ApiTask[]>([]);
+  const [newTaskTitle, setNewTaskTitle] = useState('');
+  useEffect(() => {
+    if (!booking.recordId || !isApiEnabled()) return undefined;
+    let active = true;
+    Promise.all([fetchOperationBooking(booking.recordId), fetchBookingTasks(booking.recordId)]).then(([bookingResult, taskResult]) => { if (active) { setDetail(bookingResult); setTasks(taskResult.items); } }).catch(() => undefined);
+    return () => { active = false; };
+  }, [booking.recordId]);
+  const addTask = async () => {
+    if (!booking.recordId || !newTaskTitle.trim()) return;
+    try {
+      const task = await createBookingTask(booking.recordId, { title: newTaskTitle.trim(), isRequired: false });
+      setTasks((current) => [...current, task]);
+      setNewTaskTitle('');
+      notify('สร้าง Task แล้ว');
+    } catch (error) { notify(error instanceof Error ? error.message : 'สร้าง Task ไม่สำเร็จ'); }
+  };
+  const changeTaskStatus = async (task: ApiTask, status: string) => {
+    try {
+      const updated = await updateBookingTaskStatus(task.id, { status, reason: `อัปเดตจาก Booking ${booking.id}` });
+      setTasks((current) => current.map((item) => item.id === task.id ? updated : item));
+    } catch (error) { notify(error instanceof Error ? error.message : 'อัปเดต Task ไม่สำเร็จ'); }
+  };
   const advanceStage = () => setConfirmOpen(true);
   const commitAdvance = async () => {
-    if (booking.status === 'รอยืนยัน') {
-      setConfirmBusy(true);
-      try {
-        if (await onConfirmBooking(booking)) {
-          setConfirmOpen(false);
-          setSuccessOpen(true);
-        }
-      } finally {
-        setConfirmBusy(false);
-      }
-      return;
-    }
     setConfirmBusy(true);
     try {
-      if (await onAdvanceBooking(booking)) {
-        setConfirmOpen(false);
-        setSuccessOpen(true);
-      }
-    } finally {
-      setConfirmBusy(false);
-    }
+      const ok = booking.status === 'รอยืนยัน' ? await onConfirmBooking(booking) : await onAdvanceBooking(booking);
+      if (ok) { setConfirmOpen(false); setSuccessOpen(true); }
+    } finally { setConfirmBusy(false); }
   };
-  return <><div className="drawer-layer" role="presentation" onMouseDown={onClose}><aside className="detail-drawer" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}><div className="drawer-header"><div><span className="eyebrow">Booking detail</span><h2>{booking.id}</h2><p>อัปเดตล่าสุดเมื่อ 4 นาทีที่แล้ว</p></div><button className="icon-button" onClick={onClose} aria-label="ปิด"><X size={18} /></button></div><div className="drawer-status"><em className={`status-chip ${statusClass[booking.status]}`}>{booking.status}</em><em className={`stage-label ${stageClass[booking.stage]}`}>{booking.stage}</em><span className={booking.sla === 'ปกติ' ? 'sla-ok' : 'sla-alert'}>{booking.sla}</span></div><section className="drawer-section"><h3>รายละเอียดงาน</h3><DetailLine icon={<Users size={15} />} label="ลูกค้า" value={booking.customer} /><DetailLine icon={<FileText size={15} />} label="บริการ" value={booking.service} /><DetailLine icon={<MapPin size={15} />} label="สถานที่" value={booking.site} /><DetailLine icon={<CalendarDays size={15} />} label="วันเวลา" value={`${formatThaiDate(booking.date)} · ${booking.start}–${booking.end}`} /></section><section className="drawer-section"><h3>รถและทีม</h3><DetailLine icon={<Truck size={15} />} label="รถ" value={booking.vehicle} /><DetailLine icon={<UserRound size={15} />} label="ผู้รับผิดชอบ" value={booking.driver} /></section><section className="drawer-section"><h3>Workflow timeline</h3><TimelineItem label="สร้างคำขอจอง" time="28 ส.ค. · 16:12" done /><TimelineItem label="ยืนยันคิว" time="28 ส.ค. · 16:27" done={booking.status !== 'รอยืนยัน'} /><TimelineItem label="เริ่มปฏิบัติงาน" time={booking.stage === 'รอเริ่มงาน' ? 'รอดำเนินการ' : 'วันนี้ · 09:04'} done={['กำลังเดินทาง', 'ถึงหน้างาน', 'กำลังให้บริการ', 'เสร็จสิ้น'].includes(booking.stage)} /><TimelineItem label="เสร็จสิ้นและส่งหลักฐาน" time={booking.stage === 'เสร็จสิ้น' ? 'วันนี้ · 11:18' : 'รอดำเนินการ'} done={booking.stage === 'เสร็จสิ้น'} /></section><div className="drawer-actions">{booking.status === 'รอยืนยัน' ? <button className="primary-button" onClick={advanceStage}><Check size={16} /> ยืนยันข้อมูลแล้ว</button> : booking.stage !== 'เสร็จสิ้น' && <button className="primary-button" onClick={advanceStage}><Check size={16} /> อัปเดตขั้นตอนถัดไป</button>}<button className="secondary-button" onClick={onClose}>ปิดรายละเอียด</button></div></aside></div>{confirmOpen && <FeedbackModal variant="confirm" title={booking.status === 'รอยืนยัน' ? 'ยืนยันข้อมูลกับลูกค้าแล้วหรือยัง?' : 'ยืนยันการอัปเดตสถานะ?'} copy={booking.status === 'รอยืนยัน' ? `หลังโทรเช็ก ${booking.customer} แล้ว ย้าย ${booking.id} ไปสถานะ “ยืนยันแล้ว”` : `อัปเดต ${booking.id} จาก “${booking.stage}” ไปขั้นตอนถัดไป`} confirmLabel={booking.status === 'รอยืนยัน' ? 'ย้ายเป็นยืนยันแล้ว' : 'ยืนยันการอัปเดต'} onConfirm={commitAdvance} onClose={() => { if (!confirmBusy) setConfirmOpen(false); }} busy={confirmBusy} />}{successOpen && <FeedbackModal variant="success" title={booking.status === 'รอยืนยัน' ? 'ยืนยัน Booking สำเร็จ' : 'อัปเดตสถานะสำเร็จ'} copy={booking.status === 'รอยืนยัน' ? `${booking.id} ถูกย้ายไปคอลัมน์ “ยืนยันแล้ว”` : `${booking.id} ถูกเลื่อนไปขั้นตอนถัดไปแล้ว`} confirmLabel="กลับไปดูรายการ" onConfirm={() => setSuccessOpen(false)} onClose={() => setSuccessOpen(false)} />}</>;
+  const submitCancel = async () => {
+    const reason = cancelReason.trim();
+    if (reason.length < 5) { notify('กรุณาระบุเหตุผลการยกเลิกอย่างน้อย 5 ตัวอักษร'); return; }
+    setCancelBusy(true);
+    try {
+      if (await onCancelBooking(booking, reason)) { setCancelOpen(false); setCancelReason(''); }
+    } finally { setCancelBusy(false); }
+  };
+  const revisionLines = (revision: NonNullable<ApiBookingDetail['revisions']>[number]) => Object.entries(revision.changedFields ?? {}).slice(0, 4).map(([field, value]) => {
+    if (value && typeof value === 'object' && 'before' in value && 'after' in value) return `${field}: ${String((value as { before: unknown }).before ?? '—')} → ${String((value as { after: unknown }).after ?? '—')}`;
+    return field;
+  });
+  return <><div className="drawer-layer" role="presentation" onMouseDown={onClose}><aside className="detail-drawer" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}><div className="drawer-header"><div><span className="eyebrow">Booking detail</span><h2>{booking.id}</h2><p>{booking.updatedBy ? `แก้ไขล่าสุดโดย ${booking.updatedBy.displayName}` : 'รายการจากระบบปฏิบัติการ'}</p></div><div className="drawer-header-actions"><button className="secondary-button small" onClick={() => onEditBooking(booking)}><FileText size={15} /> แก้ไข</button><button className="icon-button" onClick={onClose} aria-label="ปิด"><X size={18} /></button></div></div><div className="drawer-status"><em className={`status-chip ${statusClass[booking.status]}`}>{booking.status}</em><em className={`stage-label ${stageClass[booking.stage]}`}>{booking.stage}</em><span className={booking.sla === 'ปกติ' ? 'sla-ok' : 'sla-alert'}>{booking.sla}</span></div><section className="drawer-section"><h3>รายละเอียดงาน</h3><DetailLine icon={<Users size={15} />} label="ลูกค้า" value={booking.customer} /><DetailLine icon={<FileText size={15} />} label="บริการ" value={booking.service} /><DetailLine icon={<MapPin size={15} />} label="สถานที่" value={booking.site} /><DetailLine icon={<CalendarDays size={15} />} label="วันเวลา" value={`${formatThaiDate(booking.date)} · ${booking.start}–${booking.end}`} />{booking.estimatedVolume !== null && booking.estimatedVolume !== undefined && <DetailLine icon={<Gauge size={15} />} label="ปริมาณ" value={`${booking.estimatedVolume} ${booking.volumeUnit ?? ''}`.trim()} />}{booking.contactName && <DetailLine icon={<UserRound size={15} />} label="ผู้ติดต่อ" value={`${booking.contactName}${booking.contactPhone ? ` · ${booking.contactPhone}` : ''}`} />}</section><section className="drawer-section"><h3>ผู้รับผิดชอบและประวัติการแก้ไข</h3><DetailLine icon={<UserRound size={15} />} label="ผู้รับผิดชอบ" value={booking.responsibleUser?.displayName ?? 'ยังไม่มอบหมาย'} /><DetailLine icon={<Users size={15} />} label="สร้างโดย" value={booking.createdBy ? `${booking.createdBy.displayName}${booking.source ? ` · ${booking.source}` : ''}` : 'ไม่ระบุ'} />{booking.updatedBy && <DetailLine icon={<Check size={15} />} label="แก้ไขล่าสุดโดย" value={booking.updatedBy.displayName} />}{booking.lastChangeReason && <DetailLine icon={<FileText size={15} />} label="เหตุผลล่าสุด" value={booking.lastChangeReason} />}</section><section className="drawer-section"><div className="drawer-section-heading"><h3>Task</h3><span>{tasks.length} รายการ</span></div>{booking.recordId && isApiEnabled() && <div className="task-create-row"><input value={newTaskTitle} onChange={(event) => setNewTaskTitle(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') void addTask(); }} placeholder="เพิ่มงานที่ต้องทำ…" aria-label="ชื่องานใหม่" /><button className="primary-button small" onClick={() => void addTask()} disabled={!newTaskTitle.trim()}><Plus size={15} /> เพิ่ม</button></div>}{tasks.length ? <div className="drawer-task-list">{tasks.map((task) => <div className="drawer-task-item" key={task.id}><span className={`task-status-dot ${task.status.toLowerCase()}`} /><div><b>{task.title}</b><small>{task.assignee?.displayName ?? 'ยังไม่มอบหมาย'} · {task.priority}</small></div><select value={task.status} onChange={(event) => void changeTaskStatus(task, event.target.value)} aria-label={`สถานะ ${task.title}`}><option value="TODO">รอทำ</option><option value="IN_PROGRESS">กำลังทำ</option><option value="WAITING">รอข้อมูล</option><option value="BLOCKED">ติดปัญหา</option><option value="DONE">เสร็จแล้ว</option><option value="CANCELLED">ยกเลิก</option></select></div>)}</div> : <div className="empty-mini">ยังไม่มี Task สำหรับ Booking นี้</div>}</section><section className="drawer-section"><div className="drawer-section-heading"><h3>Audit timeline</h3><span>{detail?.revisions?.length ?? 0} revisions</span></div>{detail?.revisions?.length ? <div className="drawer-history-list">{detail.revisions.slice().reverse().map((revision) => <div className="drawer-history-item" key={revision.id}><span className="task-status-dot in_progress" /><div><b>{revision.action}</b><small>{revision.reason ?? 'ไม่มีเหตุผลระบุ'} · version {revision.version}</small>{revisionLines(revision).map((line) => <em key={line}>{line}</em>)}</div></div>)}</div> : <><TimelineItem label="สร้างคำขอจอง" time={booking.createdBy ? `โดย ${booking.createdBy.displayName}` : 'บันทึกในระบบ'} done /><TimelineItem label="ยืนยันคิว" time={booking.status === 'รอยืนยัน' ? 'รอดำเนินการ' : 'ยืนยันแล้ว'} done={booking.status !== 'รอยืนยัน'} /><TimelineItem label="เริ่มปฏิบัติงาน" time={booking.stage === 'รอเริ่มงาน' ? 'รอดำเนินการ' : 'สถานะอัปเดตแล้ว'} done={['กำลังเดินทาง', 'ถึงหน้างาน', 'กำลังให้บริการ', 'เสร็จสิ้น'].includes(booking.stage)} /><TimelineItem label="เสร็จสิ้นและส่งหลักฐาน" time={booking.stage === 'เสร็จสิ้น' ? 'เสร็จสิ้นแล้ว' : 'รอดำเนินการ'} done={booking.stage === 'เสร็จสิ้น'} /></>}</section><div className="drawer-actions">{booking.status === 'รอยืนยัน' ? <button className="primary-button" onClick={advanceStage}><Check size={16} /> ยืนยันข้อมูลแล้ว</button> : booking.stage !== 'เสร็จสิ้น' && <button className="primary-button" onClick={advanceStage}><Check size={16} /> อัปเดตขั้นตอนถัดไป</button>}{!['เสร็จสิ้น', 'ยกเลิก', 'ปฏิเสธ'].includes(booking.status) && <button className="secondary-button" onClick={() => setCancelOpen(true)}>ยกเลิก Booking</button>}<button className="secondary-button" onClick={onClose}>ปิดรายละเอียด</button></div></aside></div>{confirmOpen && <FeedbackModal variant="confirm" title={booking.status === 'รอยืนยัน' ? 'ยืนยันข้อมูลกับลูกค้าแล้วหรือยัง?' : 'ยืนยันการอัปเดตสถานะ?'} copy={booking.status === 'รอยืนยัน' ? `หลังโทรเช็ก ${booking.customer} แล้ว ย้าย ${booking.id} ไปสถานะ “ยืนยันแล้ว”` : `อัปเดต ${booking.id} จาก “${booking.stage}” ไปขั้นตอนถัดไป`} confirmLabel={booking.status === 'รอยืนยัน' ? 'ย้ายเป็นยืนยันแล้ว' : 'ยืนยันการอัปเดต'} onConfirm={commitAdvance} onClose={() => { if (!confirmBusy) setConfirmOpen(false); }} busy={confirmBusy} />}{successOpen && <FeedbackModal variant="success" title={booking.status === 'รอยืนยัน' ? 'ยืนยัน Booking สำเร็จ' : 'อัปเดตสถานะสำเร็จ'} copy={booking.status === 'รอยืนยัน' ? `${booking.id} ถูกย้ายไปคอลัมน์ “ยืนยันแล้ว”` : `${booking.id} ถูกเลื่อนไปขั้นตอนถัดไปแล้ว`} confirmLabel="กลับไปดูรายการ" onConfirm={() => setSuccessOpen(false)} onClose={() => setSuccessOpen(false)} />}{cancelOpen && <div className="feedback-modal-layer" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !cancelBusy) setCancelOpen(false); }}><section className="feedback-modal confirm" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}><button className="feedback-modal-close" aria-label="ปิด" onClick={() => setCancelOpen(false)} disabled={cancelBusy}><X size={18} /></button><div className="feedback-modal-icon"><AlertTriangle size={27} /></div><span className="feedback-modal-kicker">ต้องระบุเหตุผล</span><h2>ยกเลิก {booking.id}?</h2><p>เหตุผลจะถูกบันทึกในประวัติและ Audit Log ของระบบ</p><textarea className="cancel-reason-field" value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} rows={3} placeholder="เช่น ลูกค้าขอยกเลิกทางโทรศัพท์" autoFocus /><div className="feedback-modal-actions"><button className="secondary-button" onClick={() => setCancelOpen(false)} disabled={cancelBusy}>กลับไป</button><button className="primary-button" onClick={() => void submitCancel()} disabled={cancelBusy}>{cancelBusy ? 'กำลังยกเลิก…' : 'ยืนยันการยกเลิก'}</button></div></section></div>}</>;
+}
+
+function OpsBookingModal({ mode, booking, onClose, onSave }: { mode: 'create' | 'edit'; booking?: Booking; onClose: () => void; onSave: (payload: OpsBookingPayload | OpsBookingUpdatePayload) => Promise<boolean> }) {
+  const [customers, setCustomers] = useState<Array<{ id: string; name: string }>>([]);
+  const [sites, setSites] = useState<Array<{ id: string; name: string; district?: string | null; province?: string | null; contactName?: string | null; contactPhone?: string | null }>>([]);
+  const [services, setServices] = useState<Array<{ code: string; name: string; durationMinutes: number }>>([]);
+  const [users, setUsers] = useState<Array<{ id: string; displayName: string; role?: string }>>([]);
+  const [customerId, setCustomerId] = useState(booking?.customerOrganizationId ?? '');
+  const [siteId, setSiteId] = useState(booking?.customerSiteId ?? '');
+  const [serviceCode, setServiceCode] = useState(booking?.serviceCode ?? 'GREASE_TRAP');
+  const [date, setDate] = useState(booking?.date ?? tomorrowIso);
+  const [start, setStart] = useState(booking?.start ?? '09:00');
+  const [end, setEnd] = useState(booking?.end ?? '11:30');
+  const [volume, setVolume] = useState(booking?.estimatedVolume?.toString() ?? '');
+  const [unit, setUnit] = useState(booking?.volumeUnit ?? 'ลบ.ม.');
+  const [customerNote, setCustomerNote] = useState(booking?.customerNote ?? '');
+  const [internalNote, setInternalNote] = useState('');
+  const [contactName, setContactName] = useState(booking?.contactName ?? '');
+  const [contactPhone, setContactPhone] = useState(booking?.contactPhone ?? '');
+  const [responsibleId, setResponsibleId] = useState(booking?.responsibleUserId ?? '');
+  const [reason, setReason] = useState('');
+  const [confirmImmediately, setConfirmImmediately] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!isApiEnabled()) return undefined;
+    Promise.all([fetchOperationsCustomers(), fetchOperationsUsers(), fetchServices()]).then(([customerResult, userResult, serviceResult]) => {
+      setCustomers(customerResult.items.map((item) => ({ id: item.id, name: item.name })));
+      setUsers(userResult.items);
+      setServices(serviceResult.map((item) => ({ code: item.code, name: item.name, durationMinutes: item.durationMinutes })));
+      if (!customerId && customerResult.items[0]) setCustomerId(customerResult.items[0].id);
+    }).catch(() => setError('โหลดข้อมูลสำหรับสร้าง Booking ไม่สำเร็จ'));
+    return undefined;
+  }, [customerId]);
+
+  useEffect(() => {
+    if (!isApiEnabled() || !customerId) return undefined;
+    fetchOperationsCustomerSites(customerId).then((result) => { setSites(result.items); if (!siteId && result.items[0]) { setSiteId(result.items[0].id); setContactName(result.items[0].contactName ?? ''); setContactPhone(result.items[0].contactPhone ?? ''); } }).catch(() => setError('โหลดสถานที่ลูกค้าไม่สำเร็จ'));
+    return undefined;
+  }, [customerId, siteId]);
+
+  const submit = async () => {
+    setError('');
+    if (!customerId || !siteId || !serviceCode || !date || !start || !end) { setError('กรุณากรอกข้อมูลที่จำเป็นให้ครบ'); return; }
+    if (mode === 'edit' && (!reason.trim() || reason.trim().length < 5)) { setError('การแก้ไขต้องระบุเหตุผลอย่างน้อย 5 ตัวอักษร'); return; }
+    setBusy(true);
+    const ok = await onSave(mode === 'create' ? { customerOrganizationId: customerId, customerSiteId: siteId, serviceCode, requestedDate: date, requestedStart: start, requestedEnd: end, estimatedVolume: volume ? Number(volume) : undefined, volumeUnit: unit, customerNote: customerNote || undefined, internalNote: internalNote || undefined, responsibleUserId: responsibleId || undefined, contactName: contactName || undefined, contactPhone: contactPhone || undefined, source: 'ADMIN_PHONE', confirmImmediately } : { version: booking?.recordVersion ?? 1, customerSiteId: siteId, serviceCode, requestedDate: date, requestedStart: start, requestedEnd: end, estimatedVolume: volume ? Number(volume) : undefined, volumeUnit: unit, customerNote: customerNote || undefined, internalNote: internalNote || undefined, responsibleUserId: responsibleId || undefined, changeReason: reason.trim(), assignmentResolution: 'UNASSIGN_IF_INVALID' });
+    setBusy(false);
+    if (!ok) setError('บันทึกไม่สำเร็จ กรุณาตรวจสอบข้อมูลแล้วลองใหม่');
+  };
+
+  return <div className="feedback-modal-layer" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose(); }}><section className="ops-booking-modal" role="dialog" aria-modal="true" aria-labelledby="ops-booking-title" onMouseDown={(event) => event.stopPropagation()}><div className="ops-modal-header"><div><span className="eyebrow">{mode === 'create' ? 'Admin booking intake' : 'Booking correction'}</span><h2 id="ops-booking-title">{mode === 'create' ? 'สร้างการจองแทนลูกค้า' : `แก้ไข ${booking?.id}`}</h2><p>{mode === 'create' ? 'บันทึกข้อมูลจากการรับเรื่องทางโทรศัพท์ พร้อมผู้รับผิดชอบ' : 'ตรวจผลกระทบก่อนบันทึก และเก็บเหตุผลไว้ในประวัติ'}</p></div><button className="icon-button" onClick={onClose} disabled={busy} aria-label="ปิด"><X size={18} /></button></div><div className="ops-form-grid"><label className="field-label">ลูกค้า<select value={customerId} onChange={(event) => { setCustomerId(event.target.value); setSiteId(''); }} disabled={mode === 'edit'}><option value="">เลือกบริษัทลูกค้า</option>{customers.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><label className="field-label">สถานที่<select value={siteId} onChange={(event) => { const site = sites.find((item) => item.id === event.target.value); setSiteId(event.target.value); if (site) { setContactName(site.contactName ?? ''); setContactPhone(site.contactPhone ?? ''); } }}><option value="">เลือกสถานที่</option>{sites.map((item) => <option key={item.id} value={item.id}>{item.name} · {[item.district, item.province].filter(Boolean).join(', ')}</option>)}</select></label><label className="field-label">บริการ<select value={serviceCode} onChange={(event) => setServiceCode(event.target.value)}>{services.map((item) => <option key={item.code} value={item.code}>{item.name}</option>)}</select></label><label className="field-label">ผู้รับผิดชอบ<select value={responsibleId} onChange={(event) => setResponsibleId(event.target.value)}><option value="">ยังไม่มอบหมาย</option>{users.map((item) => <option key={item.id} value={item.id}>{item.displayName}{item.role ? ` · ${item.role}` : ''}</option>)}</select></label><label className="field-label">วันที่<input type="date" value={date} onChange={(event) => setDate(event.target.value)} /></label><label className="field-label">เวลาเริ่ม<input type="time" value={start} onChange={(event) => setStart(event.target.value)} /></label><label className="field-label">เวลาสิ้นสุด<input type="time" value={end} onChange={(event) => setEnd(event.target.value)} /></label><label className="field-label">ปริมาณ<input value={volume} onChange={(event) => setVolume(event.target.value.replace(/[^0-9.]/g, ''))} placeholder="เช่น 8" inputMode="decimal" /></label><label className="field-label">หน่วย<select value={unit} onChange={(event) => setUnit(event.target.value)}><option>ลบ.ม.</option><option>ตัน</option><option>เที่ยว</option></select></label><label className="field-label">ผู้ติดต่อ<input value={contactName} onChange={(event) => setContactName(event.target.value)} placeholder="ชื่อผู้ติดต่อ" /></label><label className="field-label">เบอร์โทร<input value={contactPhone} onChange={(event) => setContactPhone(event.target.value)} placeholder="เบอร์โทร" /></label><label className="field-label ops-form-wide">หมายเหตุลูกค้า<textarea value={customerNote} onChange={(event) => setCustomerNote(event.target.value)} rows={2} placeholder="ข้อมูลที่ลูกค้าแจ้ง" /></label><label className="field-label ops-form-wide">หมายเหตุภายใน<textarea value={internalNote} onChange={(event) => setInternalNote(event.target.value)} rows={2} placeholder="ข้อมูลสำหรับทีม Foresee" /></label>{mode === 'edit' && <label className="field-label ops-form-wide required-field">เหตุผลการแก้ไข<textarea value={reason} onChange={(event) => setReason(event.target.value)} rows={2} placeholder="เช่น ลูกค้าขอเลื่อนเวลาทางโทรศัพท์" /></label>}</div>{mode === 'create' && <label className="ops-confirm-toggle"><input type="checkbox" checked={confirmImmediately} onChange={(event) => setConfirmImmediately(event.target.checked)} /><span><b>ยืนยัน Booking ทันที</b><small>ใช้เมื่อโทรยืนยันข้อมูลกับลูกค้าเรียบร้อยแล้ว</small></span></label>}{error && <p className="form-error">{error}</p>}<div className="ops-modal-actions"><button className="secondary-button" onClick={onClose} disabled={busy}>ยกเลิก</button><button className="primary-button" onClick={() => void submit()} disabled={busy}>{busy ? 'กำลังบันทึก…' : mode === 'create' ? 'สร้าง Booking' : 'บันทึกการแก้ไข'}<ArrowRight size={16} /></button></div></section></div>;
 }
 
 function DetailLine({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) { return <div className="detail-line"><span>{icon}{label}</span><b>{value}</b></div>; }

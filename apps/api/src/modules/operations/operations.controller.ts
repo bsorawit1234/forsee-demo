@@ -1,5 +1,5 @@
-import { Controller, Get, Query, Req, UseGuards } from '@nestjs/common';
-import { ApiCookieAuth, ApiTags } from '@nestjs/swagger';
+import { Controller, Get, Param, Query, Req, UseGuards } from '@nestjs/common';
+import { ApiCookieAuth, ApiParam, ApiTags } from '@nestjs/swagger';
 import type { AuthenticatedRequest } from '../../common/request-user.js';
 import { SessionGuard } from '../auth/session.guard.js';
 import { Roles } from '../auth/roles.decorator.js';
@@ -17,10 +17,10 @@ export class OperationsController {
   constructor(private readonly bookings: BookingService, private readonly prisma: PrismaService) {}
 
   @Get('calendar/week')
-  week(@Query() query: BookingListQueryDto) { return this.bookings.opsList(query); }
+  week(@Req() request: AuthenticatedRequest, @Query() query: BookingListQueryDto) { return this.bookings.opsList(query, request.user); }
 
   @Get('calendar/day')
-  day(@Query() query: BookingListQueryDto) { return this.bookings.opsList(query); }
+  day(@Req() request: AuthenticatedRequest, @Query() query: BookingListQueryDto) { return this.bookings.opsList(query, request.user); }
 
   @Get('me')
   me(@Req() request: AuthenticatedRequest) { return { user: request.user }; }
@@ -35,5 +35,18 @@ export class OperationsController {
   async customers() {
     const items = await this.prisma.organization.findMany({ where: { type: 'CUSTOMER', status: 'ACTIVE' }, include: { _count: { select: { bookings: true } }, customerSites: { where: { isActive: true } } }, orderBy: { name: 'asc' } });
     return { items: items.map((item) => ({ id: item.id, name: item.name, bookingCount: item._count.bookings, siteCount: item.customerSites.length })) };
+  }
+
+  @Get('customers/:id/sites')
+  @ApiParam({ name: 'id', type: String, format: 'uuid' })
+  async customerSites(@Param('id') id: string) {
+    const items = await this.prisma.customerSite.findMany({ where: { customerOrganizationId: id, isActive: true }, orderBy: { name: 'asc' } });
+    return { items };
+  }
+
+  @Get('users')
+  async users(@Req() request: AuthenticatedRequest, @Query('role') role?: string) {
+    const items = await this.prisma.user.findMany({ where: { status: 'ACTIVE', memberships: { some: { organizationId: request.user.organizationId, status: 'ACTIVE', ...(role ? { role: role as any } : {}) } } }, include: { memberships: { where: { organizationId: request.user.organizationId, status: 'ACTIVE' }, select: { role: true } } }, orderBy: { displayName: 'asc' } });
+    return { items: items.map((item) => ({ id: item.id, displayName: item.displayName, email: item.email, role: item.memberships[0]?.role })) };
   }
 }

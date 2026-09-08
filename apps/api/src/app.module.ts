@@ -8,9 +8,11 @@ import { OperationsModule } from './modules/operations/operations.module.js';
 import { EventsModule } from './modules/events/events.module.js';
 import { HealthController } from './modules/health/health.controller.js';
 import { CommonModule } from './common/common.module.js';
+import { TaskModule } from './modules/tasks/task.module.js';
+import { AuditModule } from './modules/audit/audit.module.js';
 
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: ['.env', '../../.env'] }), DatabaseModule, CommonModule, AuthModule, CatalogModule, BookingModule, OperationsModule, EventsModule],
+  imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: ['.env', '../../.env'] }), DatabaseModule, CommonModule, AuthModule, CatalogModule, BookingModule, OperationsModule, EventsModule, TaskModule, AuditModule],
   controllers: [HealthController],
 })
 export class AppModule {}
